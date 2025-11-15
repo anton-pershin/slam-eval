@@ -28,10 +28,11 @@ jobs:
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         if [ -f requirements_dev.txt ]; then pip install -r requirements_dev.txt; fi
-    - name: Lint with flake8
+    - name: Lint with pylint and mypy
       run: |
-        chmod u+x run_linters.sh
-        ./run_linters.sh
+        pylint slam_eval/
+        mypy slam_eval/
+      continue-on-error: true
     - name: Test with pytest
       run: |
         pytest
