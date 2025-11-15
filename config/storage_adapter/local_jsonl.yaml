@@ -1,0 +1,2 @@
+_target_: slam_eval.storage_adapter.LocalJsonlAdapter
+path_to_jsonl: "results.jsonl"

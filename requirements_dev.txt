@@ -1,0 +1,9 @@
+# linters
+black
+isort
+pylint
+mypy
+
+# tests
+pytest
+freezegun

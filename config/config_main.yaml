@@ -1,0 +1,14 @@
+defaults:
+  - _self_
+  - user_settings: user_settings
+  - hydra: base
+  - model: local_llm
+  - collection: big_bench_hard
+  - scorer: exact_match
+  - storage_adapter: local_jsonl
+
+project_path: ${user_settings.project_path}
+result_dir: ${user_settings.result_dir}
+hydra_root: ${user_settings.hydra_root}
+hydra_dir: ${user_settings.hydra_dir}
+

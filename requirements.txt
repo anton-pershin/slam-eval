@@ -1,0 +1,5 @@
+hydra-core >= 1.3
+pytest
+datasets
+
+rally @ git+https://github.com/anton-pershin/rally.git

@@ -1,0 +1,123 @@
+from typing import Any, Optional
+import datetime
+
+import pytest
+from omegaconf import OmegaConf, DictConfig
+import hydra
+from freezegun import freeze_time
+from rally.interaction import LlmMessage
+
+from slam_eval.scripts.main import main
+from slam_eval.model import Model
+from slam_eval.collection import EvalCaseCollection, EvalCase
+from slam_eval.storage_adapter import EvalStorageAdapter
+from slam_eval.utils.common import get_config_path
+from slam_eval.utils.typing import HasStr
+
+
+DICT_STORAGE = []
+
+
+class SimpleEvalCaseCollection(EvalCaseCollection):
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+        self.i = 0
+
+    def load(self) -> None:
+        self.collection = [
+            ("Test question 1", "Test answer 1"),
+            ("Test question 2", "Test answer 2"),
+            ("Test question 3", "Test answer 3"),
+        ]
+
+    def __next__(self) -> EvalCase:
+        if self.i >= len(self.collection):
+            raise StopIteration
+        
+        res = self.collection[self.i]
+        self.i += 1
+        return {"x": res[0], "y_true": res[1]}
+
+    def __len__(self) -> int:
+        return len(self.collection)
+
+
+class SimpleEvalStorageAdapter(EvalStorageAdapter):
+    def __init__(self) -> None:
+        global DICT_STORAGE
+        self.dict_storage: list[dict[str, str]] = DICT_STORAGE
+
+    def _save_result_dict(self, result_dict: dict[str, str]) -> None:
+        self.dict_storage.append(result_dict)
+
+
+@pytest.fixture
+def cfg():
+    with hydra.initialize(
+        version_base="1.3",
+        config_path="../config",
+        job_name="test_app"
+    ):
+        default_cfg = hydra.compose(config_name="config_main")
+    
+    return default_cfg
+
+
+@pytest.fixture
+def eval_case_collection_cfg():
+    return {
+        "_target_": "tests.test_main.SimpleEvalCaseCollection",
+        "name": "simple_eval_case_collection"
+    }
+    
+
+@pytest.fixture
+def storage_adapter_cfg():
+    return {
+        "_target_": "tests.test_main.SimpleEvalStorageAdapter",
+    }
+    
+
+@freeze_time("2000-01-01")
+def test_main(
+    cfg: DictConfig,
+    eval_case_collection_cfg,
+    storage_adapter_cfg,
+    monkeypatch
+):
+    # Mock requests to LLMs
+    monkeypatch.setattr(
+        "slam_eval.model.request_based_on_message_history",
+        lambda *args, **kwargs: {
+            "role": "assistant",
+            "content": "Test answer 1"
+        }
+    )
+
+    # Mock eval case collection
+    cfg.collection = eval_case_collection_cfg
+
+    # Mock storage adapter
+    cfg.storage_adapter = storage_adapter_cfg
+
+    # Run the function being tested
+    main(cfg)   
+
+    # Check the storage
+    datetime_now = datetime.datetime.now()
+
+    global DICT_STORAGE
+    assert DICT_STORAGE == [
+        {
+            "eval_id": "{datetime}_M_{model}_C_{eval_case_collection}".format(
+                datetime=datetime_now.isoformat("_"),
+                model=cfg.model.name,
+                eval_case_collection=cfg.collection.name
+            ),
+            "timestamp": datetime_now.timestamp(),
+            "model": cfg.model.name,
+            "eval_case_collection": cfg.collection.name,
+            "scores": [1, 0, 0],
+            "model_answers": ["Test answer 1"] * 3
+        }
+    ]
