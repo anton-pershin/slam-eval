@@ -1,3 +1,4 @@
+import json
 from typing import Any
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -43,11 +44,11 @@ class EvalStorageAdapter(ABC):
         ...
 
 
-class LocalJsonlAdapter(ABC):
+class LocalJsonlAdapter(EvalStorageAdapter):
     def __init__(self, path_to_jsonl: str) -> None:
         super().__init__()
         self.path_to_jsonl = path_to_jsonl
 
     def _save_result_dict(self, result_dict: dict[str, str]) -> None:
         with open(self.path_to_jsonl, "a") as f:
-            f.writeline(result_dict)
+            f.write(json.dumps(result_dict) + "\n")
