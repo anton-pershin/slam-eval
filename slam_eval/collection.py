@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Any, TypedDict
+from typing import Any, TypedDict, Optional
 
 import datasets
 
@@ -12,7 +12,7 @@ def check_if_loaded(func):
                 f"Collection {self.name} not loaded. "
                 "Perhaps, you forgot to call load()"
             )
-        func(self, *args, **kwargs)
+        return func(self, *args, **kwargs)
 
     return wrapper
 

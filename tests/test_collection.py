@@ -33,8 +33,9 @@ class TestHuggingFaceCollection:
 
     @patch('slam_eval.collection.datasets.load_dataset')
     def test_load(self, mock_load_dataset):
-        # Setup mock dataset
+        # Setup mock dataset that is iterable
         mock_dataset = Mock()
+        mock_dataset.__iter__ = Mock(return_value=iter([]))
         mock_load_dataset.return_value = mock_dataset
         
         collection = HuggingFaceCollection(
@@ -56,6 +57,7 @@ class TestHuggingFaceCollection:
     @patch('slam_eval.collection.datasets.load_dataset')
     def test_load_with_none_values(self, mock_load_dataset):
         mock_dataset = Mock()
+        mock_dataset.__iter__ = Mock(return_value=iter([]))
         mock_load_dataset.return_value = mock_dataset
         
         collection = HuggingFaceCollection(
@@ -128,6 +130,7 @@ class TestHuggingFaceCollection:
         mock_split_data.num_rows = 100
         
         mock_dataset = Mock()
+        mock_dataset.__iter__ = Mock(return_value=iter([]))
         mock_dataset.__getitem__ = Mock(return_value=mock_split_data)
         mock_load_dataset.return_value = mock_dataset
         
@@ -155,6 +158,7 @@ class TestHuggingFaceCollection:
     @patch('slam_eval.collection.datasets.load_dataset')
     def test_iterator_protocol(self, mock_load_dataset):
         mock_dataset = Mock()
+        mock_dataset.__iter__ = Mock(return_value=iter([]))
         mock_load_dataset.return_value = mock_dataset
         
         collection = HuggingFaceCollection(
