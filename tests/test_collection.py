@@ -86,7 +86,10 @@ class TestHuggingFaceCollection:
         collection.load()
         result = next(collection)
         
-        assert result == mock_item
+        # Verify the result has the correct EvalCase structure
+        assert result == {"x": "test question", "y_true": "test answer"}
+        assert "input" not in result
+        assert "target" not in result
 
     @patch('slam_eval.collection.datasets.load_dataset')
     def test_next_multiple_items(self, mock_load_dataset):
@@ -108,11 +111,38 @@ class TestHuggingFaceCollection:
         collection.load()
         
         # Test iterating through all items
+        expected_results = [
+            {"x": "question 1", "y_true": "answer 1"},
+            {"x": "question 2", "y_true": "answer 2"},
+            {"x": "question 3", "y_true": "answer 3"}
+        ]
+        
         results = []
-        for item in mock_items:
+        for _ in mock_items:
             results.append(next(collection))
         
-        assert results == mock_items
+        assert results == expected_results
+
+    @patch('slam_eval.collection.datasets.load_dataset')
+    def test_key_mapping_transformation(self, mock_load_dataset):
+        # Test specifically for the input->x and target->y_true mapping
+        mock_item = {"input": "What is 2+2?", "target": "4"}
+        mock_dataset = Mock()
+        mock_dataset.__iter__ = Mock(return_value=iter([mock_item]))
+        mock_load_dataset.return_value = mock_dataset
+        
+        collection = HuggingFaceCollection(
+            name="test_collection",
+            dataset_name="test_dataset"
+        )
+        
+        collection.load()
+        result = next(collection)
+        
+        # Verify exact key mapping
+        assert result["x"] == "What is 2+2?"
+        assert result["y_true"] == "4"
+        assert len(result) == 2  # Only x and y_true keys should be present
 
     def test_next_raises_error_when_not_loaded(self):
         collection = HuggingFaceCollection(
@@ -125,13 +155,10 @@ class TestHuggingFaceCollection:
 
     @patch('slam_eval.collection.datasets.load_dataset')
     def test_len_returns_num_rows(self, mock_load_dataset):
-        # Setup mock dataset with num_rows
-        mock_split_data = Mock()
-        mock_split_data.num_rows = 100
-        
+        # Setup mock dataset with num_rows attribute
         mock_dataset = Mock()
         mock_dataset.__iter__ = Mock(return_value=iter([]))
-        mock_dataset.__getitem__ = Mock(return_value=mock_split_data)
+        mock_dataset.num_rows = 100
         mock_load_dataset.return_value = mock_dataset
         
         collection = HuggingFaceCollection(
@@ -144,7 +171,6 @@ class TestHuggingFaceCollection:
         result = len(collection)
         
         assert result == 100
-        mock_dataset.__getitem__.assert_called_once_with("train")
 
     def test_len_raises_error_when_not_loaded(self):
         collection = HuggingFaceCollection(

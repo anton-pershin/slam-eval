@@ -68,11 +68,12 @@ class HuggingFaceCollection(EvalCaseCollection):
 
     @check_if_loaded
     def __next__(self) -> EvalCase:
-        return next(self.collection_iter)
+        raw_item = next(self.collection_iter)
+        return EvalCase(x=raw_item["input"], y_true=raw_item["target"])
         
     @check_if_loaded
     def __len__(self) -> int:
-        return self.collection[self.split].num_rows
+        return self.collection.num_rows
 
 
 class CollectionNotLoadedError(Exception):
