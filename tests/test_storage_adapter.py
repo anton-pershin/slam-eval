@@ -129,3 +129,113 @@ class TestLocalJsonlAdapter:
                     assert result_dict["model_answers"] == [f"answer_{i}"]
                     assert result_dict["group_id"] == f"group_{i}"
                     assert result_dict["id"].startswith(f"eval:group_{i}:")
+
+    def test_load_returns_empty_list_when_file_not_exists(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            jsonl_path = os.path.join(temp_dir, "nonexistent.jsonl")
+            adapter = LocalJsonlAdapter(jsonl_path)
+            
+            results = adapter.load(".*")
+            assert results == []
+
+    def test_load_filters_by_regex(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            jsonl_path = os.path.join(temp_dir, "test_results.jsonl")
+            adapter = LocalJsonlAdapter(jsonl_path)
+            
+            # Save test data
+            test_data = [
+                {"id": "eval:group1:test_1", "model": "model1", "scores": [1]},
+                {"id": "eval:group2:test_2", "model": "model2", "scores": [2]},
+                {"id": "eval:group1:test_3", "model": "model1", "scores": [3]},
+                {"id": "other:group1:test_4", "model": "model3", "scores": [4]}
+            ]
+            
+            for data in test_data:
+                adapter._save_result_dict(data)
+            
+            # Test regex filtering
+            results = adapter.load(r"eval:group1:.*")
+            assert len(results) == 2
+            assert results[0]["id"] == "eval:group1:test_1"
+            assert results[1]["id"] == "eval:group1:test_3"
+
+    def test_load_with_different_regex_patterns(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            jsonl_path = os.path.join(temp_dir, "test_results.jsonl")
+            adapter = LocalJsonlAdapter(jsonl_path)
+            
+            # Save test data
+            test_data = [
+                {"id": "eval:exp1:2023-01-01_M_model1_C_collection1", "model": "model1"},
+                {"id": "eval:exp2:2023-01-02_M_model2_C_collection1", "model": "model2"},
+                {"id": "eval:exp1:2023-01-03_M_model1_C_collection2", "model": "model1"},
+            ]
+            
+            for data in test_data:
+                adapter._save_result_dict(data)
+            
+            # Test different patterns
+            results_exp1 = adapter.load(r"eval:exp1:.*")
+            assert len(results_exp1) == 2
+            
+            results_model1 = adapter.load(r".*_M_model1_.*")
+            assert len(results_model1) == 2
+            
+            results_collection1 = adapter.load(r".*_C_collection1")
+            assert len(results_collection1) == 2
+            
+            results_all = adapter.load(r"eval:.*")
+            assert len(results_all) == 3
+
+    def test_load_handles_malformed_json_lines(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            jsonl_path = os.path.join(temp_dir, "test_results.jsonl")
+            adapter = LocalJsonlAdapter(jsonl_path)
+            
+            # Write mixed valid and invalid JSON
+            with open(jsonl_path, "w") as f:
+                f.write('{"id": "eval:test:1", "model": "model1"}\n')
+                f.write('invalid json line\n')
+                f.write('{"id": "eval:test:2", "model": "model2"}\n')
+                f.write('\n')  # empty line
+            
+            # Should only return valid JSON entries that match regex
+            results = adapter.load(r"eval:test:.*")
+            assert len(results) == 2
+            assert results[0]["id"] == "eval:test:1"
+            assert results[1]["id"] == "eval:test:2"
+
+    def test_load_returns_empty_list_for_no_matches(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            jsonl_path = os.path.join(temp_dir, "test_results.jsonl")
+            adapter = LocalJsonlAdapter(jsonl_path)
+            
+            # Save test data
+            test_data = [
+                {"id": "eval:group1:test_1", "model": "model1"},
+                {"id": "eval:group2:test_2", "model": "model2"},
+            ]
+            
+            for data in test_data:
+                adapter._save_result_dict(data)
+            
+            # Test regex that doesn't match anything
+            results = adapter.load(r"eval:group3:.*")
+            assert results == []
+
+    def test_load_handles_entries_without_id_field(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            jsonl_path = os.path.join(temp_dir, "test_results.jsonl")
+            adapter = LocalJsonlAdapter(jsonl_path)
+            
+            # Write entries with and without id field
+            with open(jsonl_path, "w") as f:
+                f.write('{"id": "eval:test:1", "model": "model1"}\n')
+                f.write('{"model": "model2", "scores": [1, 2]}\n')  # no id field
+                f.write('{"id": "eval:test:2", "model": "model3"}\n')
+            
+            results = adapter.load(r"eval:test:.*")
+            assert len(results) == 2
+            assert results[0]["id"] == "eval:test:1"
+            assert results[1]["id"] == "eval:test:2"
