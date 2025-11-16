@@ -21,12 +21,11 @@ class TestLocalJsonlAdapter:
             adapter = LocalJsonlAdapter(jsonl_path)
             
             test_dict = {
-                "id": "test_eval_123",
                 "model": "test_model",
                 "scores": [1, 0, 1]
             }
             
-            adapter._save_result_dict(test_dict)
+            adapter._save_result_dict("test_eval_123", test_dict)
             
             # Check file was created
             assert os.path.exists(jsonl_path)
@@ -35,7 +34,8 @@ class TestLocalJsonlAdapter:
             with open(jsonl_path, 'r') as f:
                 content = f.read().strip()
                 loaded_dict = json.loads(content)
-                assert loaded_dict == test_dict
+                expected_dict = {"id": "test_eval_123", **test_dict}
+                assert loaded_dict == expected_dict
 
     def test_save_result_dict_appends_to_existing_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -43,19 +43,19 @@ class TestLocalJsonlAdapter:
             adapter = LocalJsonlAdapter(jsonl_path)
             
             # Save first result
-            first_dict = {"id": "test_1", "score": 0.8}
-            adapter._save_result_dict(first_dict)
+            first_dict = {"score": 0.8}
+            adapter._save_result_dict("test_1", first_dict)
             
             # Save second result
-            second_dict = {"id": "test_2", "score": 0.9}
-            adapter._save_result_dict(second_dict)
+            second_dict = {"score": 0.9}
+            adapter._save_result_dict("test_2", second_dict)
             
             # Check both results are in file
             with open(jsonl_path, 'r') as f:
                 lines = f.read().strip().split('\n')
                 assert len(lines) == 2
-                assert json.loads(lines[0]) == first_dict
-                assert json.loads(lines[1]) == second_dict
+                assert json.loads(lines[0]) == {"id": "test_1", **first_dict}
+                assert json.loads(lines[1]) == {"id": "test_2", **second_dict}
 
     def test_save_integration_with_base_class(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -145,14 +145,14 @@ class TestLocalJsonlAdapter:
             
             # Save test data
             test_data = [
-                {"id": "eval:group1:test_1", "model": "model1", "scores": [1]},
-                {"id": "eval:group2:test_2", "model": "model2", "scores": [2]},
-                {"id": "eval:group1:test_3", "model": "model1", "scores": [3]},
-                {"id": "other:group1:test_4", "model": "model3", "scores": [4]}
+                ("eval:group1:test_1", {"model": "model1", "scores": [1]}),
+                ("eval:group2:test_2", {"model": "model2", "scores": [2]}),
+                ("eval:group1:test_3", {"model": "model1", "scores": [3]}),
+                ("other:group1:test_4", {"model": "model3", "scores": [4]})
             ]
             
-            for data in test_data:
-                adapter._save_result_dict(data)
+            for result_id, data in test_data:
+                adapter._save_result_dict(result_id, data)
             
             # Test regex filtering
             results = adapter.load(r"eval:group1:.*")
@@ -167,13 +167,13 @@ class TestLocalJsonlAdapter:
             
             # Save test data
             test_data = [
-                {"id": "eval:exp1:2023-01-01_M_model1_C_collection1", "model": "model1"},
-                {"id": "eval:exp2:2023-01-02_M_model2_C_collection1", "model": "model2"},
-                {"id": "eval:exp1:2023-01-03_M_model1_C_collection2", "model": "model1"},
+                ("eval:exp1:2023-01-01_M_model1_C_collection1", {"model": "model1"}),
+                ("eval:exp2:2023-01-02_M_model2_C_collection1", {"model": "model2"}),
+                ("eval:exp1:2023-01-03_M_model1_C_collection2", {"model": "model1"}),
             ]
             
-            for data in test_data:
-                adapter._save_result_dict(data)
+            for result_id, data in test_data:
+                adapter._save_result_dict(result_id, data)
             
             # Test different patterns
             results_exp1 = adapter.load(r"eval:exp1:.*")
@@ -213,12 +213,12 @@ class TestLocalJsonlAdapter:
             
             # Save test data
             test_data = [
-                {"id": "eval:group1:test_1", "model": "model1"},
-                {"id": "eval:group2:test_2", "model": "model2"},
+                ("eval:group1:test_1", {"model": "model1"}),
+                ("eval:group2:test_2", {"model": "model2"}),
             ]
             
-            for data in test_data:
-                adapter._save_result_dict(data)
+            for result_id, data in test_data:
+                adapter._save_result_dict(result_id, data)
             
             # Test regex that doesn't match anything
             results = adapter.load(r"eval:group3:.*")
