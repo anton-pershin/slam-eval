@@ -21,7 +21,7 @@ class TestLocalJsonlAdapter:
             adapter = LocalJsonlAdapter(jsonl_path)
             
             test_dict = {
-                "eval_id": "test_eval_123",
+                "id": "test_eval_123",
                 "model": "test_model",
                 "scores": [1, 0, 1]
             }
@@ -43,11 +43,11 @@ class TestLocalJsonlAdapter:
             adapter = LocalJsonlAdapter(jsonl_path)
             
             # Save first result
-            first_dict = {"eval_id": "test_1", "score": 0.8}
+            first_dict = {"id": "test_1", "score": 0.8}
             adapter._save_result_dict(first_dict)
             
             # Save second result
-            second_dict = {"eval_id": "test_2", "score": 0.9}
+            second_dict = {"id": "test_2", "score": 0.9}
             adapter._save_result_dict(second_dict)
             
             # Check both results are in file
@@ -74,6 +74,7 @@ class TestLocalJsonlAdapter:
             model_answers = ["answer1", "answer2", "answer3"]
             
             adapter.save(
+                group_id="test_group",
                 model=mock_model,
                 eval_case_collection=mock_collection,
                 scores=scores,
@@ -88,10 +89,12 @@ class TestLocalJsonlAdapter:
                 
                 assert result_dict["model"] == "test_model"
                 assert result_dict["eval_case_collection"] == "test_collection"
+                assert result_dict["group_id"] == "test_group"
                 assert result_dict["scores"] == scores
                 assert result_dict["model_answers"] == model_answers
                 assert result_dict["custom_field"] == "custom_value"
-                assert "eval_id" in result_dict
+                assert "id" in result_dict
+                assert result_dict["id"].startswith("eval:test_group:")
                 assert "timestamp" in result_dict
 
     def test_save_multiple_calls_append_correctly(self):
@@ -108,6 +111,7 @@ class TestLocalJsonlAdapter:
             # Save multiple results
             for i in range(3):
                 adapter.save(
+                    group_id=f"group_{i}",
                     model=mock_model,
                     eval_case_collection=mock_collection,
                     scores=[i],
@@ -123,3 +127,5 @@ class TestLocalJsonlAdapter:
                     result_dict = json.loads(line)
                     assert result_dict["scores"] == [i]
                     assert result_dict["model_answers"] == [f"answer_{i}"]
+                    assert result_dict["group_id"] == f"group_{i}"
+                    assert result_dict["id"].startswith(f"eval:group_{i}:")

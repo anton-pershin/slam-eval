@@ -14,6 +14,7 @@ class EvalStorageAdapter(ABC):
 
     def save(
         self,
+        group_id: str,
         model: Model,
         eval_case_collection: EvalCaseCollection,
         scores: list[int | float],
@@ -22,11 +23,13 @@ class EvalStorageAdapter(ABC):
     ) -> None:
         datetime_now = datetime.now()
         result_dict = {
-            "eval_id": "{datetime}_M_{model}_C_{eval_case_collection}".format(
+            "id": "eval:{group_id}:{datetime}_M_{model}_C_{eval_case_collection}".format(
+                group_id=group_id,
                 datetime=datetime_now.isoformat("_"),
                 model=model.name,
                 eval_case_collection=eval_case_collection.name
             ),
+            "group_id": group_id,
             "timestamp": datetime_now.timestamp(),
             "model": model.name,
             "eval_case_collection": eval_case_collection.name,

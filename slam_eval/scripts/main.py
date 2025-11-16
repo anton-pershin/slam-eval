@@ -27,6 +27,7 @@ def main(cfg: DictConfig) -> None:
         scores.append(score)
 
     eval_storage_adapter.save(
+        group_id=cfg.group_id,
         model=model,
         eval_case_collection=collection,
         scores=scores,

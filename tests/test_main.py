@@ -109,11 +109,13 @@ def test_main(
     global DICT_STORAGE
     assert DICT_STORAGE == [
         {
-            "eval_id": "{datetime}_M_{model}_C_{eval_case_collection}".format(
+            "id": "eval:{group_id}:{datetime}_M_{model}_C_{eval_case_collection}".format(
+                group_id=cfg.group_id,
                 datetime=datetime_now.isoformat("_"),
                 model=cfg.model.name,
                 eval_case_collection=cfg.collection.name
             ),
+            "group_id": cfg.group_id,
             "timestamp": datetime_now.timestamp(),
             "model": cfg.model.name,
             "eval_case_collection": cfg.collection.name,
