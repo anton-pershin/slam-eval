@@ -23,13 +23,13 @@ class EvalStorageAdapter(ABC):
         **other_results
     ) -> None:
         datetime_now = datetime.now()
+        result_id = "eval:{group_id}:{datetime}_M_{model}_C_{eval_case_collection}".format(
+            group_id=group_id,
+            datetime=datetime_now.isoformat("_"),
+            model=model.name,
+            eval_case_collection=eval_case_collection.name
+        )
         result_dict = {
-            "id": "eval:{group_id}:{datetime}_M_{model}_C_{eval_case_collection}".format(
-                group_id=group_id,
-                datetime=datetime_now.isoformat("_"),
-                model=model.name,
-                eval_case_collection=eval_case_collection.name
-            ),
             "group_id": group_id,
             "timestamp": datetime_now.timestamp(),
             "model": model.name,
@@ -41,7 +41,7 @@ class EvalStorageAdapter(ABC):
         for k, v in other_results.items():
             result_dict[k] = v
 
-        self._save_result_dict(result_dict)
+        self._save_result_dict(result_id, result_dict)
 
     @abstractmethod
     def load(self, id_regex: str) -> list[dict[str, Any]]:
@@ -49,7 +49,7 @@ class EvalStorageAdapter(ABC):
         ...
 
     @abstractmethod
-    def _save_result_dict(self, result_dict: dict[str, str]) -> None:
+    def _save_result_dict(self, result_id: str, result_dict: dict[str, Any]) -> None:
         ...
 
 
@@ -81,6 +81,8 @@ class LocalJsonlAdapter(EvalStorageAdapter):
         
         return results
 
-    def _save_result_dict(self, result_dict: dict[str, str]) -> None:
+    def _save_result_dict(self, result_id: str, result_dict: dict[str, Any]) -> None:
+        # Add the ID back to the dict for JSONL format
+        result_dict_with_id = {"id": result_id, **result_dict}
         with open(self.path_to_jsonl, "a") as f:
-            f.write(json.dumps(result_dict) + "\n")
+            f.write(json.dumps(result_dict_with_id) + "\n")

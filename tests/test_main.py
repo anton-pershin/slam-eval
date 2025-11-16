@@ -45,7 +45,7 @@ class SimpleEvalCaseCollection(EvalCaseCollection):
 class SimpleEvalStorageAdapter(EvalStorageAdapter):
     def __init__(self) -> None:
         global DICT_STORAGE
-        self.dict_storage: list[dict[str, str]] = DICT_STORAGE
+        self.dict_storage: list[dict[str, Any]] = DICT_STORAGE
 
     def load(self, id_regex: str) -> list[dict[str, Any]]:
         """Load evaluation results filtered by regex pattern on id field."""
@@ -59,8 +59,9 @@ class SimpleEvalStorageAdapter(EvalStorageAdapter):
         
         return results
 
-    def _save_result_dict(self, result_dict: dict[str, str]) -> None:
-        self.dict_storage.append(result_dict)
+    def _save_result_dict(self, result_id: str, result_dict: dict[str, Any]) -> None:
+        result_dict_with_id = {"id": result_id, **result_dict}
+        self.dict_storage.append(result_dict_with_id)
 
 
 @pytest.fixture
