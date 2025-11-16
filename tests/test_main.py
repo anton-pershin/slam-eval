@@ -47,6 +47,18 @@ class SimpleEvalStorageAdapter(EvalStorageAdapter):
         global DICT_STORAGE
         self.dict_storage: list[dict[str, str]] = DICT_STORAGE
 
+    def load(self, id_regex: str) -> list[dict[str, Any]]:
+        """Load evaluation results filtered by regex pattern on id field."""
+        import re
+        pattern = re.compile(id_regex)
+        results = []
+        
+        for result_dict in self.dict_storage:
+            if "id" in result_dict and pattern.search(result_dict["id"]):
+                results.append(result_dict)
+        
+        return results
+
     def _save_result_dict(self, result_dict: dict[str, str]) -> None:
         self.dict_storage.append(result_dict)
 
