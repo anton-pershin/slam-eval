@@ -43,6 +43,7 @@ class LlmViaOpenAiApi(Model):
             message_history=messages,
             authorization=self.llm.authorization,
             model=self.llm.model,
+            max_output_tokens=self.llm.max_output_tokens,
         )
 
         return resp_message["content"]
