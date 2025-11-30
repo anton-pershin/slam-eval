@@ -1,3 +1,4 @@
+import logging
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 
@@ -5,6 +6,7 @@ import hydra
 from slam_eval.utils.common import get_config_path
 
 CONFIG_NAME = "config_main"
+LOGGER = logging.getLogger(__name__)
 
 
 def main(cfg: DictConfig) -> None:
@@ -17,7 +19,8 @@ def main(cfg: DictConfig) -> None:
     model_answers = []
     scores = []
 
-    for eval_case in collection:
+    for i, eval_case in enumerate(collection):
+        LOGGER.info(f"Run test case #{i + 1} out of {len(collection)}")
         y_pred = model.predict(eval_case["x"])
         score = scorer(eval_case["y_true"], y_pred)
 
