@@ -3,7 +3,7 @@ from typing import Optional, TypedDict
 import datasets
 
 from slam_eval.collections.base import (CollectionInfo, EvalCaseCollection,
-                                       check_if_loaded)
+                                        check_if_loaded)
 
 
 class TextGenerationInput(TypedDict):
@@ -44,7 +44,7 @@ class BigBenchHard(EvalCaseCollection):
 
     @check_if_loaded
     def __next__(self) -> TextGenerationWithUniqueGroundTruth:
-        raw_item = next(self.collection)
+        raw_item = next(self.collection)  # type: ignore
         return TextGenerationWithUniqueGroundTruth(
             x=TextGenerationInput(
                 system_prompt=None,

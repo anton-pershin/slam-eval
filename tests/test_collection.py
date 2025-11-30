@@ -178,7 +178,7 @@ class TestBigBenchHard:
             user_prompt_template="Question: {original_input}"
         )
         
-        with pytest.raises(TypeError, match="Collection not loaded. Call load\\(\\) first."):
+        with pytest.raises(CollectionNotLoadedError, match="Collection test_collection not loaded"):
             len(collection)
 
     @patch('slam_eval.collections.text_generation.datasets.load_dataset')

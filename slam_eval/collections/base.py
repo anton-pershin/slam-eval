@@ -1,8 +1,7 @@
-from abc import ABC, abstractmethod
-from typing import Any, Iterable, Optional, TypedDict, TYPE_CHECKING
+from __future__ import annotations
 
-if TYPE_CHECKING:
-    from slam_eval.collections.base import EvalCaseCollection
+from abc import ABC, abstractmethod
+from typing import Any, Iterator, Optional, TypedDict
 
 
 def check_if_loaded(func):
@@ -22,13 +21,18 @@ class EvalCase(TypedDict):
     y_true: Any
 
 
+class CollectionInfo(TypedDict):
+    collection: Iterator[Any]
+    collection_len: int
+
+
 class EvalCaseCollection(ABC):
     def __init__(self, name: str) -> None:
         self.name = name
-        self.collection: Optional[Iterable[Any]] = None
+        self.collection: Optional[Iterator[Any]] = None
         self.collection_len: Optional[int] = None
 
-    def __iter__(self) -> "EvalCaseCollection":
+    def __iter__(self) -> EvalCaseCollection:
         return self
 
     def load(self) -> None:
@@ -36,21 +40,15 @@ class EvalCaseCollection(ABC):
         self.collection = collection_info["collection"]
         self.collection_len = collection_info["collection_len"]
 
+    @check_if_loaded
     def __len__(self) -> int:
-        if self.collection_len is None:
-            raise TypeError("Collection not loaded. Call load() first.")
-        return self.collection_len
+        return self.collection_len  # type: ignore
 
     @abstractmethod
-    def _load(self) -> "CollectionInfo": ...
+    def _load(self) -> CollectionInfo: ...
 
     @abstractmethod
     def __next__(self) -> EvalCase: ...
-
-
-class CollectionInfo(TypedDict):
-    collection: Iterable[Any]
-    collection_len: int
 
 
 class CollectionNotLoadedError(Exception):

@@ -24,15 +24,19 @@ class LlmViaOpenAiApi(Model):
         messages = []
 
         if x["system_prompt"] is not None:
-            messages.append({
-                "role": "system",
-                "content": x["system_prompt"],
-            })
+            messages.append(
+                {
+                    "role": "system",
+                    "content": x["system_prompt"],
+                }
+            )
 
-        messages.append({
-            "role": "user",
-            "content": x["user_prompt"],
-        })
+        messages.append(
+            {
+                "role": "user",
+                "content": x["user_prompt"],
+            }
+        )
 
         resp_message = request_based_on_message_history(
             llm_server_url=self.llm.url,
