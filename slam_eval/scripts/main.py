@@ -18,7 +18,6 @@ def main(cfg: DictConfig) -> None:
     scores = []
 
     for eval_case in collection:
-
         y_pred = model.predict(eval_case["x"])
         score = scorer(eval_case["y_true"], y_pred)
 

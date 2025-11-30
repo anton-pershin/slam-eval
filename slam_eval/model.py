@@ -4,6 +4,8 @@ from typing import Any
 from rally.interaction import request_based_on_message_history
 from rally.llm import Llm
 
+from slam_eval.collections.text_generation import TextGenerationInput
+
 
 class Model(ABC):
     def __init__(self, name: str) -> None:
@@ -18,8 +20,19 @@ class LlmViaOpenAiApi(Model):
         super().__init__(name)
         self.llm = llm
 
-    def predict(self, x: Any) -> Any:
-        messages = [{"role": "user", "content": x}]
+    def predict(self, x: TextGenerationInput) -> str:
+        messages = []
+
+        if x["system_prompt"] is not None:
+            messages.append({
+                "role": "system",
+                "content": x["system_prompt"],
+            })
+
+        messages.append({
+            "role": "user",
+            "content": x["user_prompt"],
+        })
 
         resp_message = request_based_on_message_history(
             llm_server_url=self.llm.url,

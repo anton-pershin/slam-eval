@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 
 from rally.llm import Llm
 from slam_eval.model import LlmViaOpenAiApi
+from slam_eval.collections.text_generation import TextGenerationInput
 
 
 class TestLlmViaOpenAiApi:
@@ -32,7 +33,11 @@ class TestLlmViaOpenAiApi:
         }
         
         model = LlmViaOpenAiApi("test_model", mock_llm)
-        result = model.predict("What is 2+2?")
+        input_data = TextGenerationInput(
+            system_prompt=None,
+            user_prompt="What is 2+2?"
+        )
+        result = model.predict(input_data)
         
         assert result == "This is the model's response"
 
@@ -51,15 +56,18 @@ class TestLlmViaOpenAiApi:
         }
         
         model = LlmViaOpenAiApi("test_model", mock_llm)
-        input_text = "What is the capital of France?"
-        model.predict(input_text)
+        input_data = TextGenerationInput(
+            system_prompt=None,
+            user_prompt="What is the capital of France?"
+        )
+        model.predict(input_data)
         
         # Verify the request was called with correct parameters
         mock_request.assert_called_once_with(
             llm_server_url="http://test-url.com",
             message_history=[{
                 "role": "user",
-                "content": input_text
+                "content": "What is the capital of France?"
             }],
             authorization="Bearer test-token",
             model="gpt-4"
@@ -79,7 +87,11 @@ class TestLlmViaOpenAiApi:
         }
         
         model = LlmViaOpenAiApi("math_model", mock_llm)
-        result = model.predict("Calculate 6*7")
+        input_data = TextGenerationInput(
+            system_prompt=None,
+            user_prompt="Calculate 6*7"
+        )
+        result = model.predict(input_data)
         
         assert result == "42"
 
@@ -96,13 +108,45 @@ class TestLlmViaOpenAiApi:
         }
         
         model = LlmViaOpenAiApi("test_model", mock_llm)
-        test_input = "Hello, world!"
-        model.predict(test_input)
+        input_data = TextGenerationInput(
+            system_prompt="You are a helpful assistant",
+            user_prompt="Hello, world!"
+        )
+        model.predict(input_data)
         
         # Check that the message history has the correct format
         call_args = mock_request.call_args
         message_history = call_args[1]['message_history']
         
+        assert len(message_history) == 2
+        assert message_history[0]["role"] == "system"
+        assert message_history[0]["content"] == "You are a helpful assistant"
+        assert message_history[1]["role"] == "user"
+        assert message_history[1]["content"] == "Hello, world!"
+
+    @patch('slam_eval.model.request_based_on_message_history')
+    def test_predict_with_only_user_prompt(self, mock_request):
+        mock_llm = Mock(spec=Llm)
+        mock_llm.url = "http://test-url.com"
+        mock_llm.authorization = "Bearer test-token"
+        mock_llm.model = "test-model"
+        
+        mock_request.return_value = {
+            "role": "assistant",
+            "content": "Test response"
+        }
+        
+        model = LlmViaOpenAiApi("test_model", mock_llm)
+        input_data = TextGenerationInput(
+            system_prompt=None,
+            user_prompt="Hello, world!"
+        )
+        model.predict(input_data)
+        
+        # Check that only user message is included when system_prompt is None
+        call_args = mock_request.call_args
+        message_history = call_args[1]['message_history']
+        
         assert len(message_history) == 1
         assert message_history[0]["role"] == "user"
-        assert message_history[0]["content"] == test_input
+        assert message_history[0]["content"] == "Hello, world!"

@@ -2,4 +2,8 @@ _target_: slam_eval.collections.text_generation.BigBenchHard
 name: big_bench_hard
 dataset_name: "lukaemon/bbh"
 split: test
-subset: tracking_shuffled_objects_three_objects
+subset: dyck_languages # tracking_shuffled_objects_three_objects
+user_prompt_template: |
+  Output only the exact answer to the request below without additional explanation.
+
+  {original_input}

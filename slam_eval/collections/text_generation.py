@@ -23,11 +23,13 @@ class BigBenchHard(EvalCaseCollection):
         dataset_name: str,
         split: str,
         subset: str,
+        user_prompt_template: str,
     ) -> None:
         super().__init__(name)
         self.dataset_name = dataset_name
         self.split = split
         self.subset = subset
+        self.user_prompt_template = user_prompt_template
 
     def _load(self) -> CollectionInfo:
         collection = datasets.load_dataset(
@@ -46,7 +48,9 @@ class BigBenchHard(EvalCaseCollection):
         return TextGenerationWithUniqueGroundTruth(
             x=TextGenerationInput(
                 system_prompt=None,
-                user_prompt=raw_item["input"],
+                user_prompt=self.user_prompt_template.format(
+                    original_input=raw_item["input"],
+                ),
             ),
             y_true=raw_item["target"],
         )

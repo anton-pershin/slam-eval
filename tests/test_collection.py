@@ -11,13 +11,15 @@ class TestBigBenchHard:
             name="test_collection",
             dataset_name="test_dataset",
             split="train",
-            subset="subset1"
+            subset="subset1",
+            user_prompt_template="Question: {original_input}"
         )
         
         assert collection.name == "test_collection"
         assert collection.dataset_name == "test_dataset"
         assert collection.split == "train"
         assert collection.subset == "subset1"
+        assert collection.user_prompt_template == "Question: {original_input}"
         assert collection.collection is None
         assert collection.collection_len is None
 
@@ -33,7 +35,8 @@ class TestBigBenchHard:
             name="test_collection",
             dataset_name="test_dataset",
             split="train",
-            subset="subset1"
+            subset="subset1",
+            user_prompt_template="Question: {original_input}"
         )
         
         collection.load()
@@ -58,7 +61,8 @@ class TestBigBenchHard:
             name="test_collection",
             dataset_name="test_dataset",
             split="train",
-            subset="subset1"
+            subset="subset1",
+            user_prompt_template="Question: {original_input}"
         )
         
         collection.load()
@@ -68,7 +72,7 @@ class TestBigBenchHard:
         assert "x" in result
         assert "y_true" in result
         assert result["x"]["system_prompt"] is None
-        assert result["x"]["user_prompt"] == "test question"
+        assert result["x"]["user_prompt"] == "Question: test question"
         assert result["y_true"] == "test answer"
 
     @patch('slam_eval.collections.text_generation.datasets.load_dataset')
@@ -88,7 +92,8 @@ class TestBigBenchHard:
             name="test_collection",
             dataset_name="test_dataset",
             split="train",
-            subset="subset1"
+            subset="subset1",
+            user_prompt_template="Q: {original_input}"
         )
         
         collection.load()
@@ -100,7 +105,7 @@ class TestBigBenchHard:
         
         assert len(results) == 3
         for i, result in enumerate(results):
-            assert result["x"]["user_prompt"] == f"question {i+1}"
+            assert result["x"]["user_prompt"] == f"Q: question {i+1}"
             assert result["y_true"] == f"answer {i+1}"
             assert result["x"]["system_prompt"] is None
 
@@ -117,14 +122,15 @@ class TestBigBenchHard:
             name="test_collection",
             dataset_name="test_dataset",
             split="train",
-            subset="subset1"
+            subset="subset1",
+            user_prompt_template="Problem: {original_input}"
         )
         
         collection.load()
         result = next(collection)
         
         # Verify exact key mapping and structure
-        assert result["x"]["user_prompt"] == "What is 2+2?"
+        assert result["x"]["user_prompt"] == "Problem: What is 2+2?"
         assert result["x"]["system_prompt"] is None
         assert result["y_true"] == "4"
         assert len(result) == 2  # Only x and y_true keys should be present
@@ -135,7 +141,8 @@ class TestBigBenchHard:
             name="test_collection",
             dataset_name="test_dataset",
             split="train",
-            subset="subset1"
+            subset="subset1",
+            user_prompt_template="Question: {original_input}"
         )
         
         with pytest.raises(CollectionNotLoadedError, match="Collection test_collection not loaded"):
@@ -153,7 +160,8 @@ class TestBigBenchHard:
             name="test_collection",
             dataset_name="test_dataset",
             split="train",
-            subset="subset1"
+            subset="subset1",
+            user_prompt_template="Question: {original_input}"
         )
         
         collection.load()
@@ -166,7 +174,8 @@ class TestBigBenchHard:
             name="test_collection",
             dataset_name="test_dataset",
             split="train",
-            subset="subset1"
+            subset="subset1",
+            user_prompt_template="Question: {original_input}"
         )
         
         with pytest.raises(TypeError, match="Collection not loaded. Call load\\(\\) first."):
@@ -183,7 +192,8 @@ class TestBigBenchHard:
             name="test_collection",
             dataset_name="test_dataset",
             split="train",
-            subset="subset1"
+            subset="subset1",
+            user_prompt_template="Question: {original_input}"
         )
         
         # Test that __iter__ returns self
@@ -201,7 +211,8 @@ class TestBigBenchHard:
             name="test_collection",
             dataset_name="test_dataset",
             split="train",
-            subset="subset1"
+            subset="subset1",
+            user_prompt_template="Question: {original_input}"
         )
         
         collection.load()
@@ -209,3 +220,26 @@ class TestBigBenchHard:
         # Should raise StopIteration when no more items
         with pytest.raises(StopIteration):
             next(collection)
+
+    @patch('slam_eval.collections.text_generation.datasets.load_dataset')
+    def test_user_prompt_template_formatting(self, mock_load_dataset):
+        # Test that the user_prompt_template is correctly applied
+        mock_item = {"input": "solve this problem", "target": "solution"}
+        mock_dataset = Mock()
+        mock_dataset.__iter__ = Mock(return_value=iter([mock_item]))
+        mock_dataset.num_rows = 1
+        mock_load_dataset.return_value = mock_dataset
+        
+        collection = BigBenchHard(
+            name="test_collection",
+            dataset_name="test_dataset",
+            split="train",
+            subset="subset1",
+            user_prompt_template="Please answer: {original_input}\nAnswer:"
+        )
+        
+        collection.load()
+        result = next(collection)
+        
+        assert result["x"]["user_prompt"] == "Please answer: solve this problem\nAnswer:"
+        assert result["y_true"] == "solution"

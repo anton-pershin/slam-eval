@@ -9,6 +9,7 @@ from freezegun import freeze_time
 from slam_eval.scripts.main import main
 from slam_eval.model import Model
 from slam_eval.collections.base import EvalCaseCollection, EvalCase, CollectionInfo
+from slam_eval.collections.text_generation import TextGenerationInput
 from slam_eval.storage_adapter import EvalStorageAdapter
 from slam_eval.utils.common import get_config_path
 from slam_eval.utils.typing import HasStr
@@ -39,7 +40,13 @@ class SimpleEvalCaseCollection(EvalCaseCollection):
         
         res = self.collection_data[self.i]
         self.i += 1
-        return {"x": res[0], "y_true": res[1]}
+        return {
+            "x": TextGenerationInput(
+                system_prompt=None,
+                user_prompt=res[0]
+            ),
+            "y_true": res[1]
+        }
 
 
 class SimpleEvalStorageAdapter(EvalStorageAdapter):
