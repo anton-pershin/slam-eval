@@ -1,10 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from rally.interaction import request_based_on_message_history
 from rally.llm import Llm
-from rally.interaction import (
-    request_based_on_message_history,
-)
 
 
 class Model(ABC):
@@ -12,8 +10,7 @@ class Model(ABC):
         self.name = name
 
     @abstractmethod
-    def predict(self, x: Any) -> Any:
-        ...
+    def predict(self, x: Any) -> Any: ...
 
 
 class LlmViaOpenAiApi(Model):
@@ -22,10 +19,7 @@ class LlmViaOpenAiApi(Model):
         self.llm = llm
 
     def predict(self, x: Any) -> Any:
-        messages = [{
-            "role": "user",
-            "content": x
-        }]
+        messages = [{"role": "user", "content": x}]
 
         resp_message = request_based_on_message_history(
             llm_server_url=self.llm.url,
@@ -35,4 +29,3 @@ class LlmViaOpenAiApi(Model):
         )
 
         return resp_message["content"]
-

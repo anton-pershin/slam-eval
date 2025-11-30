@@ -5,6 +5,9 @@ max-line-length = 88
 disable = [
     "missing-docstring",      # Disable docstring requirements
     "too-few-public-methods", # Allow classes with few methods
+    "too-many-arguments",
+    "too-many-positional-arguments",
+    "wrong-import-order",     # Already addressed by isort
 ]
 
 [tool.mypy]

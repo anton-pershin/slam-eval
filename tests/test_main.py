@@ -5,11 +5,10 @@ import pytest
 from omegaconf import OmegaConf, DictConfig
 import hydra
 from freezegun import freeze_time
-from rally.interaction import LlmMessage
 
 from slam_eval.scripts.main import main
 from slam_eval.model import Model
-from slam_eval.collection import EvalCaseCollection, EvalCase
+from slam_eval.collections.base import EvalCaseCollection, EvalCase, CollectionInfo
 from slam_eval.storage_adapter import EvalStorageAdapter
 from slam_eval.utils.common import get_config_path
 from slam_eval.utils.typing import HasStr
@@ -23,23 +22,24 @@ class SimpleEvalCaseCollection(EvalCaseCollection):
         super().__init__(name)
         self.i = 0
 
-    def load(self) -> None:
-        self.collection = [
+    def _load(self) -> CollectionInfo:
+        self.collection_data = [
             ("Test question 1", "Test answer 1"),
             ("Test question 2", "Test answer 2"),
             ("Test question 3", "Test answer 3"),
         ]
+        return CollectionInfo(
+            collection=iter(self.collection_data),
+            collection_len=len(self.collection_data)
+        )
 
     def __next__(self) -> EvalCase:
-        if self.i >= len(self.collection):
+        if self.i >= len(self.collection_data):
             raise StopIteration
         
-        res = self.collection[self.i]
+        res = self.collection_data[self.i]
         self.i += 1
         return {"x": res[0], "y_true": res[1]}
-
-    def __len__(self) -> int:
-        return len(self.collection)
 
 
 class SimpleEvalStorageAdapter(EvalStorageAdapter):
@@ -89,7 +89,16 @@ def storage_adapter_cfg():
     return {
         "_target_": "tests.test_main.SimpleEvalStorageAdapter",
     }
-    
+
+
+@pytest.fixture(autouse=True)
+def reset_dict_storage():
+    """Reset the global DICT_STORAGE before each test."""
+    global DICT_STORAGE
+    DICT_STORAGE.clear()
+    yield
+    DICT_STORAGE.clear()
+
 
 @freeze_time("2000-01-01")
 def test_main(

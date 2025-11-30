@@ -1,4 +1,4 @@
-_target_: slam_eval.collection.HuggingFaceCollection
+_target_: slam_eval.collections.text_generation.BigBenchHard
 name: big_bench_hard
 dataset_name: "lukaemon/bbh"
 split: test

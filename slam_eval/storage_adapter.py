@@ -1,11 +1,11 @@
 import json
 import re
-from typing import Any
 from abc import ABC, abstractmethod
 from datetime import datetime
+from typing import Any
 
+from slam_eval.collections.base import EvalCaseCollection
 from slam_eval.model import Model
-from slam_eval.collection import EvalCaseCollection
 from slam_eval.utils.typing import HasStr
 
 
@@ -23,11 +23,13 @@ class EvalStorageAdapter(ABC):
         **other_results
     ) -> None:
         datetime_now = datetime.now()
-        result_id = "eval:{group_id}:{datetime}_M_{model}_C_{eval_case_collection}".format(
-            group_id=group_id,
-            datetime=datetime_now.isoformat("_"),
-            model=model.name,
-            eval_case_collection=eval_case_collection.name
+        result_id = (
+            "eval:{group_id}:{datetime}_M_{model}_C_{eval_case_collection}".format(
+                group_id=group_id,
+                datetime=datetime_now.isoformat("_"),
+                model=model.name,
+                eval_case_collection=eval_case_collection.name,
+            )
         )
         result_dict = {
             "group_id": group_id,
@@ -35,7 +37,7 @@ class EvalStorageAdapter(ABC):
             "model": model.name,
             "eval_case_collection": eval_case_collection.name,
             "scores": scores,
-            "model_answers": model_answers
+            "model_answers": model_answers,
         }
 
         for k, v in other_results.items():
@@ -46,11 +48,11 @@ class EvalStorageAdapter(ABC):
     @abstractmethod
     def load(self, id_regex: str) -> list[dict[str, Any]]:
         """Load evaluation results filtered by regex pattern on id field."""
-        ...
 
     @abstractmethod
-    def _save_result_dict(self, result_id: str, result_dict: dict[str, Any]) -> None:
-        ...
+    def _save_result_dict(
+        self, result_id: str, result_dict: dict[str, Any]
+    ) -> None: ...
 
 
 class LocalJsonlAdapter(EvalStorageAdapter):
@@ -62,15 +64,17 @@ class LocalJsonlAdapter(EvalStorageAdapter):
         """Load evaluation results filtered by regex pattern on id field."""
         pattern = re.compile(id_regex)
         results = []
-        
+
         try:
-            with open(self.path_to_jsonl, "r") as f:
+            with open(self.path_to_jsonl, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line:
                         try:
                             result_dict = json.loads(line)
-                            if "id" in result_dict and pattern.search(result_dict["id"]):
+                            if "id" in result_dict and pattern.search(
+                                result_dict["id"]
+                            ):
                                 results.append(result_dict)
                         except json.JSONDecodeError:
                             # Skip malformed JSON lines
@@ -78,11 +82,11 @@ class LocalJsonlAdapter(EvalStorageAdapter):
         except FileNotFoundError:
             # Return empty list if file doesn't exist
             pass
-        
+
         return results
 
     def _save_result_dict(self, result_id: str, result_dict: dict[str, Any]) -> None:
         # Add the ID back to the dict for JSONL format
         result_dict_with_id = {"id": result_id, **result_dict}
-        with open(self.path_to_jsonl, "a") as f:
+        with open(self.path_to_jsonl, "a", encoding="utf-8") as f:
             f.write(json.dumps(result_dict_with_id) + "\n")

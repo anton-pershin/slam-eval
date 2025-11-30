@@ -7,7 +7,7 @@ import pytest
 
 from slam_eval.storage_adapter import LocalJsonlAdapter
 from slam_eval.model import Model
-from slam_eval.collection import EvalCaseCollection
+from slam_eval.collections.base import EvalCaseCollection
 
 
 class TestLocalJsonlAdapter:
