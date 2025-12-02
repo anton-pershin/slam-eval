@@ -25,6 +25,7 @@ class TestLlmViaOpenAiApi:
         mock_llm.url = "http://test-url.com"
         mock_llm.authorization = "Bearer test-token"
         mock_llm.model = "test-model"
+        mock_llm.max_output_tokens = 1000
         
         # Setup mock response
         mock_request.return_value = {
@@ -48,6 +49,7 @@ class TestLlmViaOpenAiApi:
         mock_llm.url = "http://test-url.com"
         mock_llm.authorization = "Bearer test-token"
         mock_llm.model = "gpt-4"
+        mock_llm.max_output_tokens = 1000
         
         # Setup mock response
         mock_request.return_value = {
@@ -70,7 +72,8 @@ class TestLlmViaOpenAiApi:
                 "content": "What is the capital of France?"
             }],
             authorization="Bearer test-token",
-            model="gpt-4"
+            model="gpt-4",
+            max_output_tokens=1000
         )
 
     @patch('slam_eval.model.request_based_on_message_history')
@@ -79,6 +82,7 @@ class TestLlmViaOpenAiApi:
         mock_llm.url = "http://test-url.com"
         mock_llm.authorization = "Bearer test-token"
         mock_llm.model = "test-model"
+        mock_llm.max_output_tokens = 1000
         
         # Test with different response content
         mock_request.return_value = {
@@ -101,6 +105,7 @@ class TestLlmViaOpenAiApi:
         mock_llm.url = "http://test-url.com"
         mock_llm.authorization = "Bearer test-token"
         mock_llm.model = "test-model"
+        mock_llm.max_output_tokens = 1000
         
         mock_request.return_value = {
             "role": "assistant",
@@ -130,6 +135,7 @@ class TestLlmViaOpenAiApi:
         mock_llm.url = "http://test-url.com"
         mock_llm.authorization = "Bearer test-token"
         mock_llm.model = "test-model"
+        mock_llm.max_output_tokens = 1000
         
         mock_request.return_value = {
             "role": "assistant",
