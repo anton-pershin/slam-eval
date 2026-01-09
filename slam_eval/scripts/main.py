@@ -1,4 +1,5 @@
 import logging
+
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 
