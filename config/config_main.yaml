@@ -3,7 +3,7 @@ defaults:
   - user_settings: user_settings
   - hydra: base
   - model: local_llm
-  - collection: big_bench_hard
+  - collection: big_bench_hard/dyck_languages
   - scorer: exact_match
   - storage_adapter: local_jsonl
 
