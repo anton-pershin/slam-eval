@@ -4,6 +4,6 @@ dataset_name: "lukaemon/bbh"
 split: test
 subset: tracking_shuffled_objects_three_objects
 user_prompt_template: |
-  Output only the exact answer to the request below without additional explanation.
+  Output only the exact answer to the request below without additional explanation. The answer can be either (A), (B), (C) or (D), nothing else.
 
   {original_input}
