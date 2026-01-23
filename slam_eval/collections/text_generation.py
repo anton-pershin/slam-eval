@@ -1,4 +1,4 @@
-from typing import Optional, TypedDict
+from typing import Any, Optional, TypedDict
 
 import datasets
 
@@ -13,7 +13,11 @@ class TextGenerationInput(TypedDict):
 
 class TextGenerationWithUniqueGroundTruth(TypedDict):
     x: TextGenerationInput
-    y_true: str
+    y_true: str | dict[str, Any]
+
+
+class TextGenerationMetadata(TypedDict, total=False):
+    metadata: dict[str, Any]
 
 
 class BigBenchHard(EvalCaseCollection):
@@ -45,7 +49,7 @@ class BigBenchHard(EvalCaseCollection):
     @check_if_loaded
     def __next__(self) -> TextGenerationWithUniqueGroundTruth:
         raw_item = next(self.collection)  # type: ignore
-        return TextGenerationWithUniqueGroundTruth(
+        return TextGenerationWithUniqueGroundTruth(  # type: ignore[misc]
             x=TextGenerationInput(
                 system_prompt=None,
                 user_prompt=self.user_prompt_template.format(
@@ -54,3 +58,4 @@ class BigBenchHard(EvalCaseCollection):
             ),
             y_true=raw_item["target"],
         )
+

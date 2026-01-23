@@ -2,9 +2,9 @@ defaults:
   - _self_
   - user_settings: user_settings
   - hydra: base
-  - model: local_llm
-  - collection: big_bench_hard/dyck_languages
-  - scorer: exact_match
+  - model: local_llm  # local_llm, caila_o3_mini
+  - collection: big_bench_hard/tracking_shuffled_objects_three_objects # big_bench_hard/dyck_languages big_bench_hard/tracking_shuffled_objects_three_objects 
+  - scorer: ignore_all_whitespaces
   - storage_adapter: local_jsonl
 
 group_id: "default"
@@ -13,3 +13,4 @@ project_path: ${user_settings.project_path}
 result_dir: ${user_settings.result_dir}
 hydra_root: ${user_settings.hydra_root}
 hydra_dir: ${user_settings.hydra_dir}
+dataset_root: ${user_settings.dataset_root}

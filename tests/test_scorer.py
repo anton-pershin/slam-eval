@@ -1,6 +1,11 @@
 import re
+from unittest.mock import Mock
+
 import pytest
+
 from slam_eval.scorer import ExactMatch, IgnoreAllWhitespaces
+from slam_eval.ifbench.scorer import IFBenchScorer
+from slam_eval.ifbench.checker_factory import IFBenchCheckerFactory
 
 
 class TestExactMatch:
@@ -123,3 +128,33 @@ class TestIgnoreAllWhitespaces:
         scorer = IgnoreAllWhitespaces("test_scorer")
         result = scorer("Hello", "hello")
         assert result == 0
+
+
+class TestIFBenchScorer:
+    def test_partial_credit(self):
+        factory = IFBenchCheckerFactory()
+
+        checker_one = Mock()
+        checker_one.build_description = Mock()
+        checker_one.check_following = Mock(return_value=True)
+
+        checker_two = Mock()
+        checker_two.build_description = Mock()
+        checker_two.check_following = Mock(return_value=False)
+
+        factory.register("checker_one", lambda: checker_one)
+        factory.register("checker_two", lambda: checker_two)
+
+        scorer = IFBenchScorer(name="ifbench", checker_factory=factory)
+        y_true = {
+            "instruction_id_list": ["checker_one", "checker_two"],
+            "kwargs": [{}, {}],
+        }
+
+        score = scorer(y_true, "response")
+
+        assert score == 0.5
+        checker_one.build_description.assert_called_once()
+        checker_two.build_description.assert_called_once()
+        checker_one.check_following.assert_called_once_with("response")
+        checker_two.check_following.assert_called_once_with("response")

@@ -3,3 +3,4 @@ hydra_root: ${user_settings.project_path}/hydra
 hydra_dir: ${user_settings.hydra_root}/${now:%Y-%m-%d}/${now:%H-%M-%S}
 result_dir: ${user_settings.hydra_dir}
 
+dataset_root: /path/to/datasets
