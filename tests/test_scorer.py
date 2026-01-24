@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from slam_eval.scorer import ExactMatch, IgnoreAllWhitespaces
+from slam_eval.scorer import ExactMatch, IgnoreAllWhitespaces, json_string_to_dict
 from slam_eval.ifbench.scorer import IFBenchScorer
 from slam_eval.ifbench.checker_factory import IFBenchCheckerFactory
 
@@ -57,6 +57,11 @@ class TestExactMatch:
         scorer = ExactMatch("test_scorer")
         result = scorer([1, 2, 3], [1, 2, 4])
         assert result == 0
+
+    def test_exact_match_with_preprocessing(self):
+        scorer = ExactMatch("test_scorer", preprocessing_func=json_string_to_dict)
+        result = scorer({"a": 1}, '{"a": 1}')
+        assert result == 1
 
     def test_exact_match_case_sensitive(self):
         scorer = ExactMatch("test_scorer")
@@ -142,8 +147,8 @@ class TestIFBenchScorer:
         checker_two.build_description = Mock()
         checker_two.check_following = Mock(return_value=False)
 
-        factory.register("checker_one", lambda: checker_one)
-        factory.register("checker_two", lambda: checker_two)
+        factory.register("checker_one", lambda instruction_id=0: checker_one)
+        factory.register("checker_two", lambda instruction_id=0: checker_two)
 
         scorer = IFBenchScorer(name="ifbench", checker_factory=factory)
         y_true = {

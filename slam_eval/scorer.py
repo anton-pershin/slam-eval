@@ -1,6 +1,9 @@
+from __future__ import annotations
+
+import json
 import re
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Callable
 
 
 class Scorer(ABC):
@@ -12,11 +15,38 @@ class Scorer(ABC):
 
 
 class ExactMatch(Scorer):
-    def __init__(self, name: str) -> None:
+    def __init__(
+        self,
+        name: str,
+        preprocessing_func: Callable[[Any], Any] | None = None,
+    ) -> None:
         super().__init__(name)
+        self.preprocessing_func = preprocessing_func
+
+    def _preprocess(self, value: Any) -> Any:
+        if self.preprocessing_func is None:
+            return value
+        return self.preprocessing_func(value)
 
     def __call__(self, y_true: Any, y_pred: Any) -> int | float:
-        return int(y_true == y_pred)
+        processed_true = self._preprocess(y_true)
+        processed_pred = self._preprocess(y_pred)
+        return int(processed_true == processed_pred)
+
+
+def json_string_to_dict(value: Any) -> Any:
+    if isinstance(value, (dict, list)):
+        return value
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return value
+    return value
+
+
+def build_json_string_to_dict() -> Callable[[Any], Any]:
+    return json_string_to_dict
 
 
 class IgnoreAllWhitespaces(Scorer):
