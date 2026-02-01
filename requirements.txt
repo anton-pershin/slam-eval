@@ -6,6 +6,10 @@ requests
 nltk
 emoji
 syllapy
+torch
+transformers
+accelerate
+scikit-learn
 
 rally @ git+https://github.com/anton-pershin/rally.git
 kygs @ git+https://github.com/anton-pershin/kygs.git
