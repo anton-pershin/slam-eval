@@ -1,5 +1,33 @@
+[project]
+name = "slam-eval"
+description = "Evaluation library for LLMs and other foundational models"
+dynamic = ["version"]
+authors = [
+  {name = "Anton Pershin", email = "tony.pershin@gmail.com"},
+]
+readme = "README.md"
+requires-python = ">= 3.13"
+dependencies = [
+  "XXX>0.0.0",
+]
+
+[build-system]
+requires = ["hatchling >= 1.26", "versioningit"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "versioningit"
+
+[tool.versioningit]
+default-version = "0.0.0"
+
+[tool.isort]
+line_length = 88
+known_third_party = "hydra, rally"
+
 [tool.pylint]
 max-line-length = 88
+min-similarity-lines = 12
 
 [tool.pylint.'MESSAGES CONTROL']
 disable = [
@@ -8,6 +36,10 @@ disable = [
     "too-many-arguments",
     "too-many-positional-arguments",
     "wrong-import-order",     # Already addressed by isort
+    "too-many-instance-attributes",
+    "too-many-locals",
+    "no-else-return",
+    "too-many-return-statements",
 ]
 
 [tool.mypy]
