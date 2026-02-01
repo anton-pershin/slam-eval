@@ -8,11 +8,10 @@ from typing import Any, Iterator
 
 import requests
 
-from slam_eval.collections.base import CollectionInfo, EvalCaseCollection, check_if_loaded
-from slam_eval.collections.text_generation import (
-    TextGenerationInput,
-    TextGenerationWithUniqueGroundTruth,
-)
+from slam_eval.collections.base import (CollectionInfo, EvalCaseCollection,
+                                        check_if_loaded)
+from slam_eval.collections.text_generation import (TextGenerationInput,
+                                                   TextGenerationWithUniqueGroundTruth)
 
 LOGGER = logging.getLogger(__name__)
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator, Optional, TypedDict
 
@@ -101,7 +101,9 @@ class MergeQuality(EvalCaseCollection):
                     chunks=chunks,
                 )
 
-        return CollectionInfo(collection=_iterator(), collection_len=len(non_empty_lines))
+        return CollectionInfo(
+            collection=_iterator(), collection_len=len(non_empty_lines)
+        )
 
     @staticmethod
     def _format_unique_identifiers(unique_identifiers: dict[str, Any]) -> str:
@@ -135,4 +137,3 @@ class MergeQuality(EvalCaseCollection):
             ),
             y_true=attributes,
         )
-

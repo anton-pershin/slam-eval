@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Iterator, Optional, TypedDict
+from collections.abc import Callable, Iterator
+from typing import Any, Optional, TypedDict, TypeVar, cast
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 
-def check_if_loaded(func):
-    def wrapper(self, *args, **kwargs):
+def check_if_loaded(func: F) -> F:
+    def wrapper(self: EvalCaseCollection, *args: Any, **kwargs: Any):
         if self.collection is None:
             raise CollectionNotLoadedError(
                 f"Collection {self.name} not loaded. "
@@ -13,7 +16,7 @@ def check_if_loaded(func):
             )
         return func(self, *args, **kwargs)
 
-    return wrapper
+    return cast(F, wrapper)
 
 
 class EvalCase(TypedDict):
@@ -42,7 +45,11 @@ class EvalCaseCollection(ABC):
 
     @check_if_loaded
     def __len__(self) -> int:
-        return self.collection_len  # type: ignore
+        if self.collection_len is None:
+            raise CollectionNotLoadedError(
+                f"Collection {self.name} not loaded. Perhaps, you forgot to call load()"
+            )
+        return self.collection_len
 
     @abstractmethod
     def _load(self) -> CollectionInfo: ...

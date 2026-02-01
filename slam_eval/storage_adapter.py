@@ -20,16 +20,12 @@ class EvalStorageAdapter(ABC):
         eval_case_collection: EvalCaseCollection,
         scores: list[int | float],
         model_answers: list[HasStr],
-        **other_results
+        **other_results,
     ) -> None:
         datetime_now = datetime.now()
         result_id = (
-            "eval:{group_id}:{datetime}_M_{model}_C_{eval_case_collection}".format(
-                group_id=group_id,
-                datetime=datetime_now.isoformat("_"),
-                model=model.name,
-                eval_case_collection=eval_case_collection.name,
-            )
+            f"eval:{group_id}:{datetime_now.isoformat('_')}_M_"
+            f"{model.name}_C_{eval_case_collection.name}"
         )
         result_dict = {
             "group_id": group_id,

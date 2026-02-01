@@ -5,6 +5,8 @@ import re
 from abc import ABC, abstractmethod
 from typing import Any, Callable
 
+from slam_eval.utils.typing import HasStr
+
 
 class Scorer(ABC):
     def __init__(self, name: str) -> None:
@@ -50,23 +52,22 @@ def build_json_string_to_dict() -> Callable[[Any], Any]:
 
 
 class IgnoreAllWhitespaces(Scorer):
-    def __init__(self, name: str) -> None:
-        super().__init__(name)
-
-    def __call__(self, y_true: Any, y_pred: Any) -> int | float:
+    def __call__(self, y_true: HasStr, y_pred: HasStr) -> int | float:
         # Convert both inputs to strings
         y_true_str = str(y_true)
         y_pred_str = str(y_pred)
-        
-        # Create regex pattern from y_true that allows whitespace between any characters
-        # Escape special regex characters and insert \s* between each character
+
+        # Create regex pattern from y_true that allows whitespace between characters
         escaped_chars = [re.escape(char) for char in y_true_str if not char.isspace()]
         if not escaped_chars:
-            # If y_true has no non-whitespace characters, check if y_pred is also whitespace-only
-            return int(not any(char for char in y_pred_str if not char.isspace()))
-        
-        pattern = r'\s*'.join(escaped_chars)
-        pattern = r'^\s*' + pattern + r'\s*$'
-        
+            # y_true is whitespace-only, so y_pred must also be whitespace-only
+            contains_non_whitespace = any(
+                char for char in y_pred_str if not char.isspace()
+            )
+            return int(not contains_non_whitespace)
+
+        pattern = r"\s*".join(escaped_chars)
+        pattern = rf"^\s*{pattern}\s*$"
+
         # Check if y_pred matches this pattern
         return int(bool(re.match(pattern, y_pred_str)))

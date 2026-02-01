@@ -19,7 +19,6 @@ from __future__ import annotations
 from slam_eval.ifbench.checker_factory import IFBenchCheckerFactory
 from slam_eval.ifbench.instructions_registry import INSTRUCTION_DICT
 
-
 __all__ = ["build_checker_factory"]
 
 

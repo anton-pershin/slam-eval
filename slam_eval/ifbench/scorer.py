@@ -3,8 +3,8 @@ from __future__ import annotations
 import inspect
 from typing import Any, Dict, Iterable, Mapping
 
-from slam_eval.scorer import Scorer
 from slam_eval.ifbench.checker_factory import IFBenchCheckerFactory
+from slam_eval.scorer import Scorer
 
 
 class IFBenchScorer(Scorer):
@@ -18,7 +18,9 @@ class IFBenchScorer(Scorer):
         kwargs_list: Iterable[Dict[str, Any]] = y_true["kwargs"]
 
         results = []
-        for instruction_id, raw_kwargs in zip(instruction_ids, kwargs_list, strict=True):
+        for instruction_id, raw_kwargs in zip(
+            instruction_ids, kwargs_list, strict=True
+        ):
             checker = self._checker_factory(instruction_id)
             build_kwargs = self._prepare_build_description_kwargs(checker, raw_kwargs)
             checker.build_description(**build_kwargs)
