@@ -2,10 +2,9 @@
 
 ## Setup commands
 
-- Activate the environment: `conda activate slam`
+- Set up the environment: `source set_env.sh`
 - Run the main script: `python slam_eval/scripts/main.py`
 - Run tests: `pytest`
-- Run linters: `./run_linters.sh`
 
 ## Main script configuration
 
@@ -18,9 +17,18 @@
 
 - Before making any changes, create a local git branch named `YYYYMMDD_short_task_description` where `YYYYMMDD` stands for the current date. Checkout this local branch and make all the changes there. Do not forget to make occasional commits during your work to be able to roll back to previous versions of the code if necessary. NEVER commit `config/user_settings/user_settings.yaml`, keep its changes unstaged.
 - This code is configured using hydra. Its configs can be found in `config/`. No matter what constants/literals are used, they should be taken from configs. Object construction can also be made via `hydra.utils.instantiate` but use it only with simple classes (i.e., not derived from some base class).
-- Run linters before finishing the job
+- Run the following linters before finishing the job:
+  - black to ensure good formatting (note that it changes the code): `black slam_eval/`
+  - isort to ensure good import sorting (note that it changes the code): `isort slam_eval/`
+  - pylint to ensure typing: `pylint slam_eval/`
+  - mypy to ensure typing: `mypy slam_eval/`
 - Use type hints, their use is necessiated by linters
 - Update `README.md` when new functionality is added or there is outdated information
+
+### Collections
+
+- Each collection can be configured via a yaml config in `config/collection` with mandatory `name` attribute. If subdirectories are used to store the yaml config, then it should be reflected in the name where `/` should be replaced with `__`. E.g., collection `config/collection/aaa/bbb/ccc/xxx.yaml` must have name `aaa__bbb__ccc__xxx`.
+- Each collection config must refer to a class derived from `EvalCaseCollection` and must be written in such a way that you could be used for hydra-instantiation directly via `hydra.utlis.instantiate()`.
 
 ### How to add a new eval case collection for text generation
 
