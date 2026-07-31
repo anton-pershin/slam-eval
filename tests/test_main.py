@@ -1,19 +1,19 @@
-from typing import Any, Optional
 import datetime
+from typing import Any, Optional
 
-import pytest
-from omegaconf import OmegaConf, DictConfig
 import hydra
+import pytest
 from freezegun import freeze_time
+from omegaconf import DictConfig, OmegaConf
 
-from slam_eval.scripts.main import main
-from slam_eval.model import Model
-from slam_eval.collections.base import EvalCaseCollection, EvalCase, CollectionInfo
+from slam_eval.collections.base import CollectionInfo, EvalCase, EvalCaseCollection
 from slam_eval.collections.text_generation import TextGenerationInput
+from slam_eval.model import Model
+from slam_eval.scripts.main import main
 from slam_eval.storage_adapter import EvalStorageAdapter
 from slam_eval.utils.common import get_config_path
 from slam_eval.utils.typing import HasStr
-
+from slam_eval.scorer import Score, Scorer
 
 DICT_STORAGE = []
 
@@ -31,23 +31,42 @@ class SimpleEvalCaseCollection(EvalCaseCollection):
         ]
         return CollectionInfo(
             collection=iter(self.collection_data),
-            collection_len=len(self.collection_data)
+            collection_len=len(self.collection_data),
         )
 
     def __next__(self) -> EvalCase:
         if self.i >= len(self.collection_data):
             raise StopIteration
-        
+
         res = self.collection_data[self.i]
         self.i += 1
         return {
-            "x": TextGenerationInput(
-                system_prompt=None,
-                user_prompt=res[0]
-            ),
-            "y_true": res[1]
+            "x": TextGenerationInput(system_prompt=None, user_prompt=res[0]),
+            "y_true": res[1],
         }
 
+class SimpleScoreScorer(Scorer):
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+
+    def __call__(self, y_true, y_pred) -> Score:
+        return Score(primary=float(y_true == y_pred), sub_scores=None)
+
+class ComplexScoreScorer(Scorer):
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+
+    def __call__(self, y_true, y_pred) -> Score:
+        exact = float(y_true == y_pred)
+        non_empty = float(bool(y_pred))
+        primary = (exact + non_empty) / 2
+        return Score(
+            primary=primary,
+            sub_scores={
+                "exact_match": exact,
+                "non_empty": non_empty,
+            },
+        )
 
 class SimpleEvalStorageAdapter(EvalStorageAdapter):
     def __init__(self) -> None:
@@ -57,13 +76,14 @@ class SimpleEvalStorageAdapter(EvalStorageAdapter):
     def load(self, id_regex: str) -> list[dict[str, Any]]:
         """Load evaluation results filtered by regex pattern on id field."""
         import re
+
         pattern = re.compile(id_regex)
         results = []
-        
+
         for result_dict in self.dict_storage:
             if "id" in result_dict and pattern.search(result_dict["id"]):
                 results.append(result_dict)
-        
+
         return results
 
     def _save_result_dict(self, result_id: str, result_dict: dict[str, Any]) -> None:
@@ -74,12 +94,10 @@ class SimpleEvalStorageAdapter(EvalStorageAdapter):
 @pytest.fixture
 def cfg():
     with hydra.initialize(
-        version_base="1.3",
-        config_path="../config",
-        job_name="test_app"
+        version_base="1.3", config_path="../config", job_name="test_app"
     ):
         default_cfg = hydra.compose(config_name="config_main")
-    
+
     return default_cfg
 
 
@@ -87,9 +105,9 @@ def cfg():
 def eval_case_collection_cfg():
     return {
         "_target_": "tests.test_main.SimpleEvalCaseCollection",
-        "name": "simple_eval_case_collection"
+        "name": "simple_eval_case_collection",
     }
-    
+
 
 @pytest.fixture
 def storage_adapter_cfg():
@@ -97,6 +115,19 @@ def storage_adapter_cfg():
         "_target_": "tests.test_main.SimpleEvalStorageAdapter",
     }
 
+@pytest.fixture
+def simple_scorer_cfg():
+    return {
+        "_target_": "tests.test_main.SimpleScoreScorer",
+        "name": "simple_score_scorer",
+    }
+
+@pytest.fixture
+def complex_scorer_cfg():
+    return {
+        "_target_": "tests.test_main.ComplexScoreScorer",
+        "name": "complex_score_scorer",
+    }
 
 @pytest.fixture(autouse=True)
 def reset_dict_storage():
@@ -108,31 +139,24 @@ def reset_dict_storage():
 
 
 @freeze_time("2000-01-01")
-def test_main(
+def test_main_with_simple_scorer(
     cfg: DictConfig,
     eval_case_collection_cfg,
     storage_adapter_cfg,
-    monkeypatch
+    simple_scorer_cfg,
+    monkeypatch,
 ):
-    # Mock requests to LLMs
     monkeypatch.setattr(
         "slam_eval.model.request_based_on_message_history",
-        lambda *args, **kwargs: {
-            "role": "assistant",
-            "content": "Test answer 1"
-        }
+        lambda *args, **kwargs: {"role": "assistant", "content": "Test answer 1"},
     )
 
-    # Mock eval case collection
     cfg.collection = eval_case_collection_cfg
-
-    # Mock storage adapter
     cfg.storage_adapter = storage_adapter_cfg
+    cfg.scorer = simple_scorer_cfg
 
-    # Run the function being tested
-    main(cfg)   
+    main(cfg)
 
-    # Check the storage
     datetime_now = datetime.datetime.now()
 
     global DICT_STORAGE
@@ -142,13 +166,59 @@ def test_main(
                 group_id=cfg.group_id,
                 datetime=datetime_now.isoformat("_"),
                 model=cfg.model.name,
-                eval_case_collection=cfg.collection.name
+                eval_case_collection=cfg.collection.name,
             ),
             "group_id": cfg.group_id,
             "timestamp": datetime_now.timestamp(),
             "model": cfg.model.name,
             "eval_case_collection": cfg.collection.name,
-            "scores": [1, 0, 0],
-            "model_answers": ["Test answer 1"] * 3
+            "scores": [1.0, 0.0, 0.0],
+            "sub_scores": [None, None, None],
+            "model_answers": ["Test answer 1"] * 3,
+        }
+    ]
+
+
+@freeze_time("2000-01-01")
+def test_main_with_complex_scorer(
+    cfg: DictConfig,
+    eval_case_collection_cfg,
+    storage_adapter_cfg,
+    complex_scorer_cfg,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "slam_eval.model.request_based_on_message_history",
+        lambda *args, **kwargs: {"role": "assistant", "content": "Test answer 1"},
+    )
+
+    cfg.collection = eval_case_collection_cfg
+    cfg.storage_adapter = storage_adapter_cfg
+    cfg.scorer = complex_scorer_cfg
+
+    main(cfg)
+
+    datetime_now = datetime.datetime.now()
+
+    global DICT_STORAGE
+    assert DICT_STORAGE == [
+        {
+            "id": "eval:{group_id}:{datetime}_M_{model}_C_{eval_case_collection}".format(
+                group_id=cfg.group_id,
+                datetime=datetime_now.isoformat("_"),
+                model=cfg.model.name,
+                eval_case_collection=cfg.collection.name,
+            ),
+            "group_id": cfg.group_id,
+            "timestamp": datetime_now.timestamp(),
+            "model": cfg.model.name,
+            "eval_case_collection": cfg.collection.name,
+            "scores": [1.0, 0.5, 0.5],
+            "sub_scores": [
+                {"exact_match": 1.0, "non_empty": 1.0},
+                {"exact_match": 0.0, "non_empty": 1.0},
+                {"exact_match": 0.0, "non_empty": 1.0},
+            ],
+            "model_answers": ["Test answer 1"] * 3,
         }
     ]
