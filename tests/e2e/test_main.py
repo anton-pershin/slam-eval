@@ -6,14 +6,14 @@ import pytest
 from freezegun import freeze_time
 from omegaconf import DictConfig, OmegaConf
 
-from slam_eval.collections.base import CollectionInfo, EvalCase, EvalCaseCollection
-from slam_eval.collections.text_generation import TextGenerationInput
-from slam_eval.model import Model
+from slam_core.collections.base import CollectionInfo, EvalCase, EvalCaseCollection
+from slam_core.collections.text_generation import TextGenerationInput
+from slam_core.model import Model
 from slam_eval.scripts.main import main
-from slam_eval.storage_adapter import EvalStorageAdapter
-from slam_eval.utils.common import get_config_path
-from slam_eval.utils.typing import HasStr
-from slam_eval.scorer import Score, Scorer
+from slam_core.storage_adapter import EvalStorageAdapter
+from slam_core.utils.common import get_config_path
+from slam_core.utils.typing import HasStr
+from slam_core.scorers.base import Score, Scorer
 
 DICT_STORAGE = []
 
@@ -94,7 +94,7 @@ class SimpleEvalStorageAdapter(EvalStorageAdapter):
 @pytest.fixture
 def cfg():
     with hydra.initialize(
-        version_base="1.3", config_path="../config", job_name="test_app"
+        version_base="1.3", config_path="../../config", job_name="test_app"
     ):
         default_cfg = hydra.compose(config_name="config_main")
 
@@ -104,7 +104,7 @@ def cfg():
 @pytest.fixture
 def eval_case_collection_cfg():
     return {
-        "_target_": "tests.test_main.SimpleEvalCaseCollection",
+        "_target_": "tests.e2e.test_main.SimpleEvalCaseCollection",
         "name": "simple_eval_case_collection",
     }
 
@@ -112,20 +112,20 @@ def eval_case_collection_cfg():
 @pytest.fixture
 def storage_adapter_cfg():
     return {
-        "_target_": "tests.test_main.SimpleEvalStorageAdapter",
+        "_target_": "tests.e2e.test_main.SimpleEvalStorageAdapter",
     }
 
 @pytest.fixture
 def simple_scorer_cfg():
     return {
-        "_target_": "tests.test_main.SimpleScoreScorer",
+        "_target_": "tests.e2e.test_main.SimpleScoreScorer",
         "name": "simple_score_scorer",
     }
 
 @pytest.fixture
 def complex_scorer_cfg():
     return {
-        "_target_": "tests.test_main.ComplexScoreScorer",
+        "_target_": "tests.e2e.test_main.ComplexScoreScorer",
         "name": "complex_score_scorer",
     }
 
@@ -147,7 +147,7 @@ def test_main_with_simple_scorer(
     monkeypatch,
 ):
     monkeypatch.setattr(
-        "slam_eval.model.request_based_on_message_history",
+        "slam_core.model.request_based_on_message_history",
         lambda *args, **kwargs: {"role": "assistant", "content": "Test answer 1"},
     )
 
@@ -188,7 +188,7 @@ def test_main_with_complex_scorer(
     monkeypatch,
 ):
     monkeypatch.setattr(
-        "slam_eval.model.request_based_on_message_history",
+        "slam_core.model.request_based_on_message_history",
         lambda *args, **kwargs: {"role": "assistant", "content": "Test answer 1"},
     )
 

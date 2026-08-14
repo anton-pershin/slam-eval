@@ -1,2 +1,0 @@
-_target_: slam_eval.scorer.IgnoreAllWhitespaces
-name: "ignore_all_whitespaces"

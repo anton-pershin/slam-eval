@@ -12,6 +12,10 @@ conda activate slam_eval
 ```bash
 pip install -r requirements.txt
 ```
+For local development with an editable `slam-core`, override the git dependency:
+```bash
+pip install -e ../slam-core
+```
 3. Set up `/config/user_settings/user_settings.yaml`
 4. Run one of the scripts `/project_name/scripts/main.py` and do not forget to modify the corresponding config file in `/config/config_main.yaml'
 ```bash

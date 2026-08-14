@@ -1,3 +1,0 @@
-_target_: slam_eval.merge_quality.scorer.MergeQualityScorer
-name: "merge_quality"
-

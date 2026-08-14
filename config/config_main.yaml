@@ -2,15 +2,21 @@ defaults:
   - _self_
   - user_settings: user_settings
   - hydra: base
-  - model: local_llm  # local_llm, caila_o3_mini
-  - collection: big_bench_hard/tracking_shuffled_objects_three_objects # big_bench_hard/dyck_languages big_bench_hard/tracking_shuffled_objects_three_objects 
-  - scorer: ignore_all_whitespaces
+  - model: caila_qwen3_8b
+  - collection: merge_quality/merge_quality_easy
+  - scorer: merge_quality
   - storage_adapter: local_jsonl
 
-group_id: "default"
+group_id: "merge_quality_easy_qwen3_8b"
+
 
 project_path: ${user_settings.project_path}
 result_dir: ${user_settings.result_dir}
 hydra_root: ${user_settings.hydra_root}
 hydra_dir: ${user_settings.hydra_dir}
 dataset_root: ${user_settings.dataset_root}
+slam_shared_config: ${oc.env:SLAM_SHARED_CONFIG,/path/to/slam/shared/config}
+
+hydra:
+  searchpath:
+    - file://${slam_shared_config}
