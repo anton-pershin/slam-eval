@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from slam_eval.scorer import Score, Scorer
+from slam_core.scorers.base import Score, Scorer
 
 
 def normalize_value(val: Any) -> str:

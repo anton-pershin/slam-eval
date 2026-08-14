@@ -4,9 +4,9 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any
 
-from slam_eval.collections.base import EvalCaseCollection
-from slam_eval.model import Model
-from slam_eval.scorer import Score
+from slam_core.collections.base import EvalCaseCollection
+from slam_core.model import Model
+from slam_core.scorers.base import Score
 from slam_eval.utils.typing import HasStr
 
 

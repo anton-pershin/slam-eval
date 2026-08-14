@@ -1,7 +1,9 @@
-project_path: /path/to/this/repo
+project_path: /home/tony/reps/github/anton-pershin/slam-eval
 hydra_root: ${user_settings.project_path}/hydra
 hydra_dir: ${user_settings.hydra_root}/${now:%Y-%m-%d}/${now:%H-%M-%S}
 result_dir: ${user_settings.hydra_dir}
 
-model_root: /path/to/models
-dataset_root: /path/to/datasets
+model_root: /home/tony/models
+dataset_root: /home/tony/datasets
+
+caila_api_key: "1000222226.172060.Ebn95sTFbuiWunHNrb8OjuUJuv6g0AFlmUTprjsc"

@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from unittest.mock import Mock
 
-from slam_eval.model import EmbeddingBasedTextClassifier
+from slam_core.model import EmbeddingBasedTextClassifier
 
 
 class DummyClassifier:

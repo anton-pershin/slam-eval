@@ -3,9 +3,9 @@ import os
 import tempfile
 from unittest.mock import Mock
 
-from slam_eval.collections.base import EvalCaseCollection
-from slam_eval.model import Model
-from slam_eval.scorer import Score
+from slam_core.collections.base import EvalCaseCollection
+from slam_core.model import Model
+from slam_core.scorers.base import Score
 from slam_eval.storage_adapter import LocalJsonlAdapter
 
 
