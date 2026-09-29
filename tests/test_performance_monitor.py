@@ -224,6 +224,9 @@ class TestOpenAiStreamingCollector:
         assert result["tokens_source"] == "usage"
         assert result["content"] == "Hello world!"
         assert result["tpot_s"] is not None
+        # magnitude sanity: TPOT is (last chunk elapsed - ttft) / (n-1), bounded
+        # by e2e; a clock-mixup bug would produce absurd values (regression guard)
+        assert 0.0 < result["tpot_s"] < result["e2e_time_s"]
 
     def test_chunk_count_fallback(self, monkeypatch):
         chunks = [(0.01, "a"), (0.01, "b")]

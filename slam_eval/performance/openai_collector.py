@@ -77,7 +77,7 @@ class OpenAiStreamingCollector:
                         now = time.perf_counter()
                         if ttft is None:
                             ttft = now - t_start
-                        t_last_chunk = now
+                        t_last_chunk = now - t_start  # elapsed, not absolute
                         chunk_count += 1
                         content_parts.append(content)
         except urllib.error.HTTPError as err:
