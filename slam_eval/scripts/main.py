@@ -41,6 +41,7 @@ def main(cfg: DictConfig) -> None:
             ram_pids=perf_cfg.get("ram_pids"),
             device_index=perf_cfg.get("device_index", 0),
             streaming=perf_cfg.get("streaming", True),
+            self_monitor=perf_cfg.get("self_monitor", False),
         )
         if hasattr(model, "llm"):  # OpenAI-compatible path
             llm = model.llm

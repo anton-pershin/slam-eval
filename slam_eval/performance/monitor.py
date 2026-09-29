@@ -54,6 +54,7 @@ class PerformanceMonitor:
         device_index: int = 0,
         step_callback: Optional[Callable[[int], None]] = None,
         streaming: bool = True,
+        self_monitor: bool = False,
     ) -> None:
         self.stats = (
             stats
@@ -77,6 +78,14 @@ class PerformanceMonitor:
         self.openai_collector: Any = None
         self.streaming_fallback_intended = False
         self._sampler: Optional[MemorySampler] = None
+        if self_monitor:
+            # In-process model scenario (FR6): monitor the current process.
+            import os
+
+            if not ram_pids:
+                ram_pids = [os.getpid()]
+            if not gpu_pids:
+                gpu_pids = [os.getpid()]
         if ram_pids or gpu_pids:
             self._sampler = MemorySampler(
                 interval_s=sampler_interval_s,

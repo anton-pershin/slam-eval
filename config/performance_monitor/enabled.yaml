@@ -7,6 +7,7 @@ enabled: true
 stats: ["min", "max", "mean", "median", "q5", "q95"]
 warmup_cases: 0
 sampler_interval_s: 0.1
+self_monitor: false # true => sample the current process (LocalCausalLm scenario)
 gpu_pids: null      # e.g. [12345] -- vLLM server PID for per-process VRAM
 ram_pids: null      # e.g. [12345] -- PIDs whose RSS to sample
 device_index: 0
