@@ -72,8 +72,6 @@ def main(cfg: DictConfig) -> None:
         if monitor is not None:
             if hasattr(model, "step_callback") and hasattr(model, "tokenizer"):
                 # In-process path: count prompt tokens for FR3
-                import torch  # noqa: F401 - only for .to below
-
                 messages = _build_messages(eval_case["x"])
                 prompt_text = model.tokenizer.apply_chat_template(
                     messages, tokenize=False, add_generation_prompt=True

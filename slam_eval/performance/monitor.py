@@ -77,6 +77,7 @@ class PerformanceMonitor:
 
         self.openai_collector: Any = None
         self.streaming_fallback_intended = False
+        self._pending_prompt_tokens: Optional[int] = None
         self._sampler: Optional[MemorySampler] = None
         if self_monitor:
             # In-process model scenario (FR6): monitor the current process.
@@ -107,6 +108,7 @@ class PerformanceMonitor:
         self._t_prediction_start = time.perf_counter()
         self._token_state.reset()
         self._token_state.t_start = self._t_prediction_start
+        self._pending_prompt_tokens = None
 
     def on_prediction_end(self, case_index: int) -> None:
         t_end = time.perf_counter()
@@ -199,7 +201,7 @@ class PerformanceMonitor:
             "e2e_time_s": e2e,
             "ttft_s": ttft,
             "tpot_s": tpot,
-            "prompt_tokens": None,  # filled by the in-process collector path
+            "prompt_tokens": self._pending_prompt_tokens,
             "generated_tokens": ts.generated_tokens if ts.generated_tokens else None,
             "warmup": case_index < self.warmup_cases,
         }
@@ -225,8 +227,12 @@ class PerformanceMonitor:
         return (ts.t_last_token - ts.t_first_token) / (ts.generated_tokens - 1)
 
     def set_prompt_tokens(self, case_index: int, prompt_tokens: int) -> None:
-        if self._raw_records and self._raw_records[-1]["case_id"] == case_index:
-            self._raw_records[-1]["prompt_tokens"] = prompt_tokens
+        """Record prompt token count for the case currently being measured.
+
+        Called between on_prediction_start and on_prediction_end, so the
+        pending value is attached when on_prediction_end builds the record.
+        """
+        self._pending_prompt_tokens = prompt_tokens
 
     def build_aggregated(
         self, group_id: str, run_metadata: dict[str, Any]
