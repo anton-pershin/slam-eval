@@ -6,6 +6,7 @@ defaults:
   - collection: merge_quality/merge_quality_easy
   - scorer: merge_quality
   - storage_adapter: local_jsonl
+  - performance_monitor: disabled
 
 group_id: "merge_quality_easy_qwen3_8b"
 

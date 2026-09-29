@@ -5,15 +5,15 @@ import hydra
 import pytest
 from freezegun import freeze_time
 from omegaconf import DictConfig, OmegaConf
-
 from slam_core.collections.base import CollectionInfo, EvalCase, EvalCaseCollection
 from slam_core.collections.text_generation import TextGenerationInput
 from slam_core.model import Model
-from slam_eval.scripts.main import main
+from slam_core.scorers.base import Score, Scorer
 from slam_core.storage_adapter import EvalStorageAdapter
 from slam_core.utils.common import get_config_path
 from slam_core.utils.typing import HasStr
-from slam_core.scorers.base import Score, Scorer
+
+from slam_eval.scripts.main import main
 
 DICT_STORAGE = []
 
@@ -45,12 +45,14 @@ class SimpleEvalCaseCollection(EvalCaseCollection):
             "y_true": res[1],
         }
 
+
 class SimpleScoreScorer(Scorer):
     def __init__(self, name: str) -> None:
         super().__init__(name)
 
     def __call__(self, y_true, y_pred) -> Score:
         return Score(primary=float(y_true == y_pred), sub_scores=None)
+
 
 class ComplexScoreScorer(Scorer):
     def __init__(self, name: str) -> None:
@@ -67,6 +69,7 @@ class ComplexScoreScorer(Scorer):
                 "non_empty": non_empty,
             },
         )
+
 
 class SimpleEvalStorageAdapter(EvalStorageAdapter):
     def __init__(self) -> None:
@@ -115,6 +118,7 @@ def storage_adapter_cfg():
         "_target_": "tests.e2e.test_main.SimpleEvalStorageAdapter",
     }
 
+
 @pytest.fixture
 def simple_scorer_cfg():
     return {
@@ -122,12 +126,14 @@ def simple_scorer_cfg():
         "name": "simple_score_scorer",
     }
 
+
 @pytest.fixture
 def complex_scorer_cfg():
     return {
         "_target_": "tests.e2e.test_main.ComplexScoreScorer",
         "name": "complex_score_scorer",
     }
+
 
 @pytest.fixture(autouse=True)
 def reset_dict_storage():

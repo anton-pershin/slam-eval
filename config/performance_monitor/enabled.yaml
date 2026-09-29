@@ -1,0 +1,14 @@
+# Performance monitoring enabled with explicit settings.
+# Memory targets: for LocalCausalLm use the current process (omitted here --
+# the monitor itself runs in-process and samples are tagged automatically);
+# for a local vLLM server, set ram_pids/gpu_pids to the server PIDs manually.
+_target_: slam_eval.performance.monitor.PerformanceMonitor
+enabled: true
+stats: ["min", "max", "mean", "median", "q5", "q95"]
+warmup_cases: 0
+sampler_interval_s: 0.1
+gpu_pids: null      # e.g. [12345] -- vLLM server PID for per-process VRAM
+ram_pids: null      # e.g. [12345] -- PIDs whose RSS to sample
+device_index: 0
+streaming: true     # false => explicitly non-streaming model (no fallback warning)
+result_dir: ${user_settings.result_dir}
