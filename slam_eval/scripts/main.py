@@ -70,6 +70,16 @@ def main(cfg: DictConfig) -> None:
             monitor.on_prediction_start(i)
         y_pred = model.predict(eval_case["x"])
         if monitor is not None:
+            if hasattr(model, "step_callback") and hasattr(model, "tokenizer"):
+                # In-process path: count prompt tokens for FR3
+                import torch  # noqa: F401 - only for .to below
+
+                messages = _build_messages(eval_case["x"])
+                prompt_text = model.tokenizer.apply_chat_template(
+                    messages, tokenize=False, add_generation_prompt=True
+                )
+                prompt_ids = model.tokenizer(prompt_text)["input_ids"]
+                monitor.set_prompt_tokens(i, len(prompt_ids))
             if monitor.openai_collector is not None:
                 messages = _build_messages(eval_case["x"])
                 result = monitor.openai_collector.measure(
