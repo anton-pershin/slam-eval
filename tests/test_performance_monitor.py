@@ -185,7 +185,8 @@ class TestMemorySampler:
         sampler.stop()
         samples = sampler.drain_samples()
         assert samples  # thread alive
-        assert all(s["rss_bytes"] in (0, None) for s in samples)
+        # NFR5: unavailable PID is null, never a misleading integer 0
+        assert all(s["rss_bytes"] is None for s in samples)
 
     def test_pynvml_blocked_never_crashes(self, monkeypatch):
         import slam_eval.performance.sampler as sampler_mod
@@ -281,3 +282,85 @@ class TestStorage:
         agg = json.load(open(agg_path))
         assert agg["e2e_time_s"]["n"] == 1
         assert "performance_g1" in raw_path
+
+
+class TestRunKeyTimestamp:
+    def test_timestamped_run_key_no_collision(self, tmp_path):
+        """FR10: two runs with the same group_id must not overwrite each other."""
+        s1 = LocalPerformanceStorageAdapter(result_dir=str(tmp_path))
+        s2 = LocalPerformanceStorageAdapter(result_dir=str(tmp_path))
+        p1 = s1.save_raw("g1", [{"case_id": 0}])
+        p2 = s2.save_raw("g1", [{"case_id": 0}, {"case_id": 1}])
+        assert p1 != p2
+        assert len(open(p1).read().strip().splitlines()) == 1
+        assert len(open(p2).read().strip().splitlines()) == 2
+
+
+class TestSingleRequestOpenAiPath:
+    """FR11/NFR1: the measured request IS the prediction; one record per case."""
+
+    def test_record_already_appended_no_double(self):
+        monitor = PerformanceMonitor()
+        monitor.on_prediction_start(0)
+        monitor.note_openai_result(
+            case_index=0,
+            e2e_s=1.0,
+            ttft_s=0.1,
+            generated_tokens=10,
+            prompt_tokens=5,
+            tpot_s=0.09,
+        )
+        monitor.on_prediction_end(0, record_already_appended=True)
+        assert len(monitor.raw_records) == 1  # no duplicate
+
+    def test_collector_tpot_preferred(self):
+        monitor = PerformanceMonitor()
+        monitor.on_prediction_start(0)
+        monitor.note_openai_result(
+            case_index=0,
+            e2e_s=2.0,
+            ttft_s=0.5,
+            generated_tokens=10,
+            prompt_tokens=5,
+            tpot_s=0.111,  # chunk-delta value is authoritative
+        )
+        monitor.on_prediction_end(0, record_already_appended=True)
+        assert monitor.raw_records[0]["tpot_s"] == 0.111
+
+    def test_non_streaming_branch(self, monkeypatch):
+        import slam_eval.performance.openai_collector as mod
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def read(self):
+                return json.dumps(
+                    {
+                        "choices": [{"message": {"content": "Hi"}}],
+                        "usage": {"prompt_tokens": 3, "completion_tokens": 2},
+                    }
+                ).encode()
+
+        monkeypatch.setattr(mod.urllib.request, "urlopen", lambda req: FakeResponse())
+        collector = OpenAiStreamingCollector("http://fake", None, "m")
+        result = collector.measure(
+            [{"role": "user", "content": "hi"}], non_streaming=True
+        )
+        assert result["streaming_failed"] is False
+        assert result["content"] == "Hi"
+        assert result["ttft_s"] is None and result["tpot_s"] is None
+        assert result["prompt_tokens"] == 3 and result["generated_tokens"] == 2
+
+    def test_phase_tag_order_scoring(self):
+        """FR7: scorer runs INSIDE the score phase (loop order fixed)."""
+        monitor = PerformanceMonitor()
+        monitor.on_prediction_start(0)
+        monitor.on_prediction_end(0)
+        monitor.on_scoring_start()
+        assert monitor._phase == "score"  # scorer executes here in main.py
+        monitor.on_scoring_end()
+        assert monitor._phase == "idle"

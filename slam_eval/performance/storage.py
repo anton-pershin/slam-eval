@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Any
 
 RawRecord = dict[str, Any]
@@ -19,6 +20,11 @@ class PerformanceStorageAdapter(ABC):
     @abstractmethod
     def save_aggregated(self, group_id: str, aggregated: dict[str, Any]) -> str: ...
 
+    @abstractmethod
+    def save_memory_samples(
+        self, group_id: str, samples: list[dict[str, Any]]
+    ) -> str: ...
+
 
 class LocalPerformanceStorageAdapter(PerformanceStorageAdapter):
     """Writes raw.jsonl + aggregated.json under a run-keyed directory.
@@ -29,11 +35,15 @@ class LocalPerformanceStorageAdapter(PerformanceStorageAdapter):
 
     def __init__(self, result_dir: str) -> None:
         self.result_dir = result_dir
+        # One timestamp per adapter instance: all saves within a run share
+        # one run directory; different runs (or re-runs) never collide and
+        # can be matched with the timestamped score artifact id (FR10).
+        self._run_timestamp = datetime.now().isoformat("_", timespec="microseconds")
 
     def run_dir(self, group_id: str) -> str:
-        # The same run within one process must reuse one directory: keyed by
-        # group_id plus a per-instance timestamp taken at construction.
-        return os.path.join(self.result_dir, f"performance_{group_id}")
+        return os.path.join(
+            self.result_dir, f"performance_{group_id}_{self._run_timestamp}"
+        )
 
     def save_raw(self, group_id: str, records: list[RawRecord]) -> str:
         run_dir = self.run_dir(group_id)
@@ -50,4 +60,14 @@ class LocalPerformanceStorageAdapter(PerformanceStorageAdapter):
         path = os.path.join(run_dir, "aggregated.json")
         with open(path, "w", encoding="utf-8") as f:
             json.dump(aggregated, f, ensure_ascii=False, indent=2)
+        return path
+
+    def save_memory_samples(self, group_id: str, samples: list[dict[str, Any]]) -> str:
+        """Raw phase-tagged memory samples in their own JSONL (FR7, D2)."""
+        run_dir = self.run_dir(group_id)
+        os.makedirs(run_dir, exist_ok=True)
+        path = os.path.join(run_dir, "memory_samples.jsonl")
+        with open(path, "w", encoding="utf-8") as f:
+            for sample in samples:
+                f.write(json.dumps(sample, ensure_ascii=False) + "\n")
         return path

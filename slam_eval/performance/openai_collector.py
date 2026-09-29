@@ -29,7 +29,15 @@ class OpenAiStreamingCollector:
         self,
         messages: list[dict[str, str]],
         max_output_tokens: Optional[int] = None,
+        non_streaming: bool = False,
     ) -> dict[str, Any]:
+        """One request = one measurement (and the prediction itself).
+
+        ``non_streaming`` (FR5 ``disabled_in_config``): plain request, no
+        timing beyond e2e; FR3 metrics are null without a fallback warning.
+        """
+        if non_streaming:
+            return self._measure_non_streaming(messages, max_output_tokens)
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
@@ -119,4 +127,57 @@ class OpenAiStreamingCollector:
             "prompt_tokens": prompt_tokens,
             "generated_tokens": generated_tokens,
             "tokens_source": tokens_source,
+        }
+
+    def _measure_non_streaming(
+        self,
+        messages: list[dict[str, str]],
+        max_output_tokens: Optional[int],
+    ) -> dict[str, Any]:
+        import urllib.error
+
+        payload: dict[str, Any] = {"model": self.model, "messages": messages}
+        if max_output_tokens is not None:
+            payload["max_tokens"] = max_output_tokens
+        body = json.dumps(payload).encode("utf-8")
+        request = urllib.request.Request(
+            self.url,
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                **({"Authorization": self.authorization} if self.authorization else {}),
+            },
+        )
+        t_start = time.perf_counter()
+        try:
+            with urllib.request.urlopen(request) as response:  # noqa: S310
+                data = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as err:
+            LOGGER.warning("Non-streaming request rejected: HTTP %s", err.code)
+            return {
+                "streaming_failed": True,
+                "fallback_reason": "streaming_request_rejected",
+            }
+        except (urllib.error.URLError, OSError, json.JSONDecodeError) as err:
+            LOGGER.warning("Non-streaming request failed: %s", err)
+            return {
+                "streaming_failed": True,
+                "fallback_reason": "streaming_request_rejected",
+            }
+        e2e = time.perf_counter() - t_start
+        choices = data.get("choices") or []
+        content = ""
+        if choices:
+            message = choices[0].get("message") or {}
+            content = message.get("content") or ""
+        usage = data.get("usage") or {}
+        return {
+            "streaming_failed": False,
+            "content": content,
+            "e2e_time_s": e2e,
+            "ttft_s": None,
+            "tpot_s": None,
+            "prompt_tokens": usage.get("prompt_tokens"),
+            "generated_tokens": usage.get("completion_tokens"),
+            "tokens_source": "usage" if usage else None,
         }

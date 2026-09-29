@@ -93,12 +93,14 @@ class MemorySampler:
         with self._lock:
             self._samples.append(sample)
 
-    def _read_vram(self) -> int:
+    def _read_vram(self) -> Optional[int]:
         import pynvml  # local import so blocking it for tests is easy
 
         pynvml.nvmlInit()
         try:
             handle = pynvml.nvmlDeviceGetHandleByIndex(self._device_index)
+            total = 0
+            any_found = False
             total = 0
             for pid in self._gpu_pids:
                 try:
@@ -108,20 +110,25 @@ class MemorySampler:
                 for p in proc:
                     if p.pid == pid:
                         total += int(p.usedGpuMemory or 0)
-            return total
+                        any_found = True
+            return total if any_found else None
         finally:
             pynvml.nvmlShutdown()
 
-    def _read_rss(self) -> int:
+    def _read_rss(self) -> Optional[int]:
+        """Sum RSS of configured PIDs; None when no PID was readable (NFR5:
+        unavailable is null, never a misleading 0)."""
         if psutil is None:
-            return 0
+            return None
         total = 0
+        any_read = False
         for pid in self._ram_pids:
             try:
                 total += psutil.Process(pid).memory_info().rss
+                any_read = True
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 LOGGER.warning("PID %s for RSS sampling unavailable", pid)
-        return total
+        return total if any_read else None
 
     def drain_samples(self) -> list[dict[str, Any]]:
         """Return and clear all samples collected so far."""

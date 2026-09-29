@@ -31,18 +31,15 @@ def main(cfg: DictConfig) -> None:
     monitor: PerformanceMonitor | None = None
     perf_storage: LocalPerformanceStorageAdapter | None = None
     if perf_cfg is not None and perf_cfg.get("enabled", False):
-        monitor = PerformanceMonitor(
-            stats=list(
-                perf_cfg.get("stats", ["min", "max", "mean", "median", "q5", "q95"])
-            ),
-            warmup_cases=perf_cfg.get("warmup_cases", 0),
-            sampler_interval_s=perf_cfg.get("sampler_interval_s", 0.1),
-            gpu_pids=perf_cfg.get("gpu_pids"),
-            ram_pids=perf_cfg.get("ram_pids"),
-            device_index=perf_cfg.get("device_index", 0),
-            streaming=perf_cfg.get("streaming", True),
-            self_monitor=perf_cfg.get("self_monitor", False),
-        )
+        # D6: single source of truth — the YAML declares _target_; instantiate it.
+        # `enabled` and `result_dir` are loop-level options, not constructor args.
+        from omegaconf import open_dict
+
+        monitor_kwargs = perf_cfg.copy()
+        with open_dict(monitor_kwargs):
+            monitor_kwargs.pop("enabled", None)
+            monitor_kwargs.pop("result_dir", None)
+        monitor = instantiate(monitor_kwargs)
         if hasattr(model, "llm"):  # OpenAI-compatible path
             llm = model.llm
             monitor.openai_collector = OpenAiStreamingCollector(
@@ -68,49 +65,66 @@ def main(cfg: DictConfig) -> None:
         LOGGER.info("Run test case #%s out of %s", i + 1, collection_length)
         if monitor is not None:
             monitor.on_prediction_start(i)
-        y_pred = model.predict(eval_case["x"])
-        if monitor is not None:
-            if hasattr(model, "step_callback") and hasattr(model, "tokenizer"):
+        record_appended = False
+        if monitor is not None and monitor.openai_collector is not None:
+            # Single-request measurement (FR5/FR11/NFR1): the monitored
+            # streaming request IS the prediction. No second request.
+            result = monitor.openai_collector.measure(
+                _build_messages(eval_case["x"]),
+                max_output_tokens=getattr(model.llm, "max_output_tokens", None),
+                non_streaming=not monitor.streaming,
+            )
+            if result.get("streaming_failed"):
+                monitor.note_streaming_fallback(
+                    result["fallback_reason"],
+                    warn=not monitor.streaming_fallback_intended,
+                )
+                monitor.note_openai_result(
+                    case_index=i,
+                    e2e_s=result.get("e2e_time_s") or 0.0,
+                    ttft_s=None,
+                    generated_tokens=None,
+                    prompt_tokens=None,
+                )
+            else:
+                monitor.note_openai_result(
+                    case_index=i,
+                    e2e_s=result["e2e_time_s"],
+                    ttft_s=result["ttft_s"],
+                    generated_tokens=result["generated_tokens"],
+                    prompt_tokens=result["prompt_tokens"],
+                    tpot_s=result.get("tpot_s"),
+                )
+                if result.get("tokens_source") == "chunk_count":
+                    monitor.note_usage_fallback()
+            y_pred = result.get("content") or ""
+            record_appended = True
+        else:
+            y_pred = model.predict(eval_case["x"])
+            if (
+                monitor is not None
+                and hasattr(model, "step_callback")
+                and hasattr(model, "tokenizer")
+            ):
                 # In-process path: count prompt tokens for FR3
                 messages = _build_messages(eval_case["x"])
                 prompt_text = model.tokenizer.apply_chat_template(
-                    messages, tokenize=False, add_generation_prompt=True
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                    chat_template_kwargs=(
+                        {"enable_thinking": model.enable_thinking}
+                        if getattr(model, "enable_thinking", None) is not None
+                        else {}
+                    ),
                 )
                 prompt_ids = model.tokenizer(prompt_text)["input_ids"]
                 monitor.set_prompt_tokens(i, len(prompt_ids))
-            if monitor.openai_collector is not None:
-                messages = _build_messages(eval_case["x"])
-                result = monitor.openai_collector.measure(
-                    messages,
-                    max_output_tokens=getattr(model.llm, "max_output_tokens", None),
-                )
-                if result.get("streaming_failed"):
-                    monitor.note_streaming_fallback(
-                        result["fallback_reason"],
-                        warn=not monitor.streaming_fallback_intended,
-                    )
-                    monitor.note_openai_result(
-                        case_index=i,
-                        e2e_s=result.get("e2e_time_s") or 0.0,
-                        ttft_s=None,
-                        generated_tokens=None,
-                        prompt_tokens=None,
-                    )
-                else:
-                    monitor.note_openai_result(
-                        case_index=i,
-                        e2e_s=result["e2e_time_s"],
-                        ttft_s=result["ttft_s"],
-                        generated_tokens=result["generated_tokens"],
-                        prompt_tokens=result["prompt_tokens"],
-                    )
-                if result.get("tokens_source") == "chunk_count":
-                    monitor.note_usage_fallback()
-                y_pred = result.get("content") or y_pred
-            monitor.on_prediction_end(i)
-        score = scorer(eval_case["y_true"], y_pred)
+        if monitor is not None:
+            monitor.on_prediction_end(i, record_already_appended=record_appended)
         if monitor is not None:
             monitor.on_scoring_start()
+        score = scorer(eval_case["y_true"], y_pred)
         model_answers.append(y_pred)
         scores.append(score)
         if monitor is not None:
@@ -131,6 +145,7 @@ def main(cfg: DictConfig) -> None:
         )
         perf_storage.save_raw(cfg.group_id, monitor.raw_records)
         perf_storage.save_aggregated(cfg.group_id, aggregated)
+        perf_storage.save_memory_samples(cfg.group_id, monitor.memory_samples)
         LOGGER.info(
             "Performance artifacts saved under %s",
             perf_storage.run_dir(cfg.group_id),

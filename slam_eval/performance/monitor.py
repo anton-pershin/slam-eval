@@ -52,7 +52,9 @@ class PerformanceMonitor:
         gpu_pids: Optional[list[int]] = None,
         ram_pids: Optional[list[int]] = None,
         device_index: int = 0,
-        step_callback: Optional[Callable[[int], None]] = None,
+        step_callback: Optional[
+            Callable[[int], None]
+        ] = None,  # noqa: ARG001 - reserved for per-call overrides
         streaming: bool = True,
         self_monitor: bool = False,
     ) -> None:
@@ -110,15 +112,24 @@ class PerformanceMonitor:
         self._token_state.t_start = self._t_prediction_start
         self._pending_prompt_tokens = None
 
-    def on_prediction_end(self, case_index: int) -> None:
-        t_end = time.perf_counter()
-        e2e = (
-            t_end - self._t_prediction_start
-            if self._t_prediction_start is not None
-            else None
-        )
-        record = self._build_record(case_index, e2e)
-        self._raw_records.append(record)
+    def on_prediction_end(
+        self, case_index: int, record_already_appended: bool = False
+    ) -> None:
+        """Close the prediction phase.
+
+        ``record_already_appended``: the OpenAI path appends its own record
+        from the collector result (single-request measurement); the loop must
+        then not append a second one.
+        """
+        if not record_already_appended:
+            t_end = time.perf_counter()
+            e2e = (
+                t_end - self._t_prediction_start
+                if self._t_prediction_start is not None
+                else None
+            )
+            record = self._build_record(case_index, e2e)
+            self._raw_records.append(record)
         self._phase = PHASE_IDLE
 
     def on_scoring_start(self) -> None:
@@ -152,7 +163,8 @@ class PerformanceMonitor:
         )
         if not self._warned_streaming:
             LOGGER.warning(
-                "Server usage not reported; token counts are approximate (chunk counting)"
+                "Server usage not reported; token counts are approximate "
+                "(chunk counting)"
             )
             self._warned_streaming = True
 
@@ -173,9 +185,19 @@ class PerformanceMonitor:
         ttft_s: Optional[float],
         generated_tokens: Optional[int],
         prompt_tokens: Optional[int],
+        tpot_s: Optional[float] = None,
     ) -> None:
-        """Record a completed OpenAI-path call measured by the collector."""
-        tpot = self._compute_tpot(ttft_s, e2e_s, generated_tokens)
+        """Record a completed OpenAI-path call measured by the collector.
+
+        TPOT single ownership (D4): the collector's chunk-delta TPOT (based
+        on t_last_chunk) is authoritative when provided; the e2e-based
+        recomputation is only a fallback for records without it.
+        """
+        tpot = (
+            tpot_s
+            if tpot_s is not None
+            else self._compute_tpot(ttft_s, e2e_s, generated_tokens)
+        )
         self._raw_records.append(
             {
                 "case_id": case_index,
@@ -256,7 +278,6 @@ class PerformanceMonitor:
         for mem_metric in ("vram_bytes", "rss_bytes"):
             mem_values = [s.get(mem_metric) for s in predict_samples]
             aggregated[mem_metric] = aggregate(mem_values, self.stats)
-        aggregated["memory_samples_raw"] = self._memory_samples
         aggregated["run_metadata"] = {
             **run_metadata,
             "warmup_cases_excluded": self.warmup_cases,
@@ -267,3 +288,7 @@ class PerformanceMonitor:
     @property
     def raw_records(self) -> list[dict[str, Any]]:
         return self._raw_records
+
+    @property
+    def memory_samples(self) -> list[dict[str, Any]]:
+        return self._memory_samples
