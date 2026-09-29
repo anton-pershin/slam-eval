@@ -7,4 +7,4 @@ result_dir: ${user_settings.hydra_dir}
 model_root: /home/tony/models
 dataset_root: /home/tony/datasets
 
-caila_api_key: "1000222226.172060.Ebn95sTFbuiWunHNrb8OjuUJuv6g0AFlmUTprjsc"
+caila_api_key: ${oc.env:CAILA_API_KEY,null}

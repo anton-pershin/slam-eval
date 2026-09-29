@@ -22,7 +22,7 @@ pip install -e ../slam-core
 python project_name/scripts/main.py
 ```
 
-⚠️  DO NOT commit your `user_settings.yaml`
+⚠️  DO NOT commit your personal `user_settings.yaml` values — secrets (e.g. `caila_api_key`) are read from the environment: the tracked config references `${oc.env:CAILA_API_KEY,null}`, so export `CAILA_API_KEY` before running.
 
 ## Scripts
 
