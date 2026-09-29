@@ -62,3 +62,7 @@ disable = [
 
 [tool.mypy]
 disable_error_code = ["import-untyped"]
+
+[[tool.mypy.overrides]]
+module = ["pynvml", "psutil"]
+ignore_missing_imports = true

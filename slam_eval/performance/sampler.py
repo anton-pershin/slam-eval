@@ -25,7 +25,7 @@ except ImportError:  # pragma: no cover
     psutil = None  # type: ignore[assignment]
 
 
-class MemorySample(dict):  # type: type[dict]
+class MemorySample(dict):
     """Phase-tagged memory sample: {timestamp, phase, vram_bytes, rss_bytes}."""
 
 
