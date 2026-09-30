@@ -1,0 +1,11 @@
+_target_: slam_eval.performance.monitor.PerformanceMonitor
+enabled: false
+stats: ["min", "max", "mean", "median", "q5", "q95"]
+warmup_cases: 0
+sampler_interval_s: 0.1
+self_monitor: false
+gpu_pids: null
+ram_pids: null
+device_index: 0
+streaming: true
+result_dir: null

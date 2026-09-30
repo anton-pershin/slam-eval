@@ -1,0 +1,15 @@
+# Performance monitoring enabled with explicit settings.
+# Memory targets:
+#   self_monitor: true          -> sample the current process (LocalCausalLm scenario)
+#   gpu_pids / ram_pids: [ ... ] -> manual PIDs (local vLLM server scenario)
+_target_: slam_eval.performance.monitor.PerformanceMonitor
+enabled: true
+stats: ["min", "max", "mean", "median", "q5", "q95"]
+warmup_cases: 0
+sampler_interval_s: 0.1
+self_monitor: false
+gpu_pids: null
+ram_pids: null
+device_index: 0
+streaming: true     # false => explicitly non-streaming model (nulls, no fallback warning)
+result_dir: ${user_settings.result_dir}

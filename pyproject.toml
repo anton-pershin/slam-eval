@@ -58,7 +58,22 @@ disable = [
     "too-many-locals",
     "no-else-return",
     "too-many-return-statements",
+    "too-many-branches",      # performance collectors parse branching protocols
+    "too-many-statements",
+    "broad-exception-caught", # monitor/sampler must never crash the eval loop
+    "import-outside-toplevel",# lazy heavy/optional imports (pynvml, torch)
+    "redefined-outer-name",   # optional-dependency import pattern (pynvml, urllib.error)
+    "reimported",
+    "attribute-defined-outside-init",  # TokenTimingState reset pattern
+    "unused-argument",        # lifecycle hook signatures are part of the contract
 ]
+
+[tool.pylint.'TYPECHECK']
+ignored-modules = ["pynvml", "psutil"]
 
 [tool.mypy]
 disable_error_code = ["import-untyped"]
+
+[[tool.mypy.overrides]]
+module = ["pynvml", "psutil"]
+ignore_missing_imports = true
