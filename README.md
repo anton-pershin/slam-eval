@@ -43,3 +43,8 @@ Runs evaluation
 #### Output
 
 Creates XXX
+
+## Performance monitoring
+
+See `docs/performance-hosting-caveats.md` for backend-specific caveats when
+interpreting TTFT/TPOT (reasoning models on Caila, vLLM flashinfer JIT, etc.).
