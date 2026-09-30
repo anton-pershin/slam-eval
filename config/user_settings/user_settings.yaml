@@ -1,10 +1,8 @@
-project_path: /home/tony/reps/github/anton-pershin/slam-eval
-shared_config_path: /home/tony/reps/github/anton-pershin/slam-core
-hydra_root: ${user_settings.project_path}/hydra
+hydra_root: ${oc.env:SLAM_EVAL_HYDRA_PATH, /tmp/slam_eval_hydra}
 hydra_dir: ${user_settings.hydra_root}/${now:%Y-%m-%d}/${now:%H-%M-%S}
 result_dir: ${user_settings.hydra_dir}
 
-model_root: /home/tony/models
-dataset_root: /home/tony/datasets
+model_root: ${oc.env:SLAM_CORE_MODEL_PATH, null}
+dataset_root: ${oc.env:SLAM_CORE_DATASET_PATH, null}
 
 caila_api_key: ${oc.env:CAILA_API_KEY,null}

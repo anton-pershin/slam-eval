@@ -16,13 +16,11 @@ For local development with an editable `slam-core`, override the git dependency:
 ```bash
 pip install -e ../slam-core
 ```
-3. Set up `/config/user_settings/user_settings.yaml`
+3. Set up environment variables mentioned in `/config/user_settings/user_settings.yaml`
 4. Run one of the scripts `/project_name/scripts/main.py` and do not forget to modify the corresponding config file in `/config/config_main.yaml'
 ```bash
 python project_name/scripts/main.py
 ```
-
-⚠️  DO NOT commit your personal `user_settings.yaml` values — secrets (e.g. `caila_api_key`) are read from the environment: the tracked config references `${oc.env:CAILA_API_KEY,null}`, so export `CAILA_API_KEY` before running.
 
 ## Scripts
 

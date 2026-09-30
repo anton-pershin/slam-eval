@@ -10,13 +10,11 @@ defaults:
 
 group_id: "merge_quality_easy_qwen3_8b"
 
-
-project_path: ${user_settings.project_path}
 result_dir: ${user_settings.result_dir}
 hydra_root: ${user_settings.hydra_root}
 hydra_dir: ${user_settings.hydra_dir}
 dataset_root: ${user_settings.dataset_root}
-slam_shared_config: ${oc.env:SLAM_SHARED_CONFIG,/path/to/slam/shared/config}
+slam_shared_config: ${oc.env:SLAM_SHARED_CONFIG_PATH, null}
 
 hydra:
   searchpath:
