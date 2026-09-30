@@ -196,7 +196,11 @@ class PerformanceMonitor:
         tpot = (
             tpot_s
             if tpot_s is not None
-            else self._compute_tpot(ttft_s, e2e_s, generated_tokens)
+            else (
+                self._compute_tpot(ttft_s, e2e_s, generated_tokens)
+                if e2e_s is not None
+                else None
+            )
         )
         self._raw_records.append(
             {
