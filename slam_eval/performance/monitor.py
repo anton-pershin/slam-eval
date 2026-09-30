@@ -65,14 +65,16 @@ class PerformanceMonitor:
         )
         self.warmup_cases = warmup_cases
         self.streaming = streaming
+        # FR5 signal (a): the metadata must reflect config-disabled streaming
+        # from the start, not only when a request fails.
+        self._streaming_state = {
+            "supported": streaming,
+            "fallback_reason": None if streaming else "disabled_in_config",
+        }
         self._raw_records: list[dict[str, Any]] = []
         self._memory_samples: list[dict[str, Any]] = []
         self._phase = PHASE_IDLE
         self._t_prediction_start: Optional[float] = None
-        self._streaming_state: dict[str, Any] = {
-            "supported": True,
-            "fallback_reason": None,
-        }
         self._warned_streaming = False
         self._token_state = TokenTimingState()
         self._on_step_hook: Optional[Callable[[], None]] = None

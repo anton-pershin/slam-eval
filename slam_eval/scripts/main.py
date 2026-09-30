@@ -69,9 +69,19 @@ def main(cfg: DictConfig) -> None:
         if monitor is not None and monitor.openai_collector is not None:
             # Single-request measurement (FR5/FR11/NFR1): the monitored
             # streaming request IS the prediction. No second request.
+            # NOTE (N2): on this branch the collector OWNS the request —
+            # model.predict() is never called. Any request-shaping logic
+            # (system prompts, generation params) must be passed here
+            # explicitly; changes inside the Model class will NOT apply.
+            max_tokens = getattr(model.llm, "max_output_tokens", None)
+            if max_tokens is None and hasattr(model.llm, "max_output_tokens"):
+                raise ValueError(
+                    "model.llm.max_output_tokens is set but resolved to None; "
+                    "the collector would silently drop the generation cap"
+                )
             result = monitor.openai_collector.measure(
                 _build_messages(eval_case["x"]),
-                max_output_tokens=getattr(model.llm, "max_output_tokens", None),
+                max_output_tokens=max_tokens,
                 non_streaming=not monitor.streaming,
             )
             if result.get("streaming_failed"):

@@ -395,3 +395,24 @@ class TestAuthFailure:
         result = collector.measure([{"role": "user", "content": "hi"}])
         assert result["streaming_failed"] is True
         assert result["e2e_time_s"] is None
+
+
+class TestStreamingDisabledMetadata:
+    def test_disabled_in_config_reflected_at_construction(self):
+        """FR5 signal (a): streaming=false -> supported=False, reason set immediately."""
+        from slam_eval.performance.monitor import PerformanceMonitor
+
+        monitor = PerformanceMonitor(streaming=False)
+        agg = monitor.build_aggregated("g", {})
+        state = agg["run_metadata"]["streaming"]
+        assert state["supported"] is False
+        assert state["fallback_reason"] == "disabled_in_config"
+
+    def test_streaming_true_default(self):
+        from slam_eval.performance.monitor import PerformanceMonitor
+
+        monitor = PerformanceMonitor(streaming=True)
+        agg = monitor.build_aggregated("g", {})
+        state = agg["run_metadata"]["streaming"]
+        assert state["supported"] is True
+        assert state["fallback_reason"] is None
