@@ -181,7 +181,7 @@ class PerformanceMonitor:
     def note_openai_result(
         self,
         case_index: int,
-        e2e_s: float,
+        e2e_s: Optional[float],
         ttft_s: Optional[float],
         generated_tokens: Optional[int],
         prompt_tokens: Optional[int],

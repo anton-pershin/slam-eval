@@ -89,6 +89,13 @@ class OpenAiStreamingCollector:
                         chunk_count += 1
                         content_parts.append(content)
         except urllib.error.HTTPError as err:
+            if err.code in (401, 403):
+                # Authorization failure is a configuration error, not a
+                # server capability: fail loudly, never fall back silently.
+                raise RuntimeError(
+                    f"Authorization failed (HTTP {err.code}) for {self.url}. "
+                    "Check the API key / credentials configuration."
+                ) from err
             LOGGER.warning("Streaming request rejected: HTTP %s", err.code)
             return {
                 "streaming_failed": True,
@@ -99,6 +106,7 @@ class OpenAiStreamingCollector:
             return {
                 "streaming_failed": True,
                 "fallback_reason": "streaming_request_rejected",
+                "e2e_time_s": None,  # no completed request: no fabricated 0
             }
         e2e = time.perf_counter() - t_start
         if ttft is None or chunk_count == 0:
@@ -153,6 +161,11 @@ class OpenAiStreamingCollector:
             with urllib.request.urlopen(request) as response:  # noqa: S310
                 data = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as err:
+            if err.code in (401, 403):
+                raise RuntimeError(
+                    f"Authorization failed (HTTP {err.code}) for {self.url}. "
+                    "Check the API key / credentials configuration."
+                ) from err
             LOGGER.warning("Non-streaming request rejected: HTTP %s", err.code)
             return {
                 "streaming_failed": True,
@@ -163,6 +176,7 @@ class OpenAiStreamingCollector:
             return {
                 "streaming_failed": True,
                 "fallback_reason": "streaming_request_rejected",
+                "e2e_time_s": None,
             }
         e2e = time.perf_counter() - t_start
         choices = data.get("choices") or []

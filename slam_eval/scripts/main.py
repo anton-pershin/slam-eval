@@ -81,7 +81,7 @@ def main(cfg: DictConfig) -> None:
                 )
                 monitor.note_openai_result(
                     case_index=i,
-                    e2e_s=result.get("e2e_time_s") or 0.0,
+                    e2e_s=result.get("e2e_time_s"),  # None if no completed request
                     ttft_s=None,
                     generated_tokens=None,
                     prompt_tokens=None,

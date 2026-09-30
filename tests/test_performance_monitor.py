@@ -364,3 +364,34 @@ class TestSingleRequestOpenAiPath:
         assert monitor._phase == "score"  # scorer executes here in main.py
         monitor.on_scoring_end()
         assert monitor._phase == "idle"
+
+
+class TestAuthFailure:
+    def test_auth_failure_raises(self, monkeypatch):
+        """401/403 => RuntimeError, never a silent metrics fallback."""
+        import urllib.error
+
+        import slam_eval.performance.openai_collector as mod
+
+        def raise_401(req):
+            raise urllib.error.HTTPError(req.full_url, 401, "Unauthorized", None, None)
+
+        monkeypatch.setattr(mod.urllib.request, "urlopen", raise_401)
+        collector = OpenAiStreamingCollector("http://fake", "Bearer bad", "m")
+        with pytest.raises(RuntimeError, match="Authorization failed"):
+            collector.measure([{"role": "user", "content": "hi"}])
+
+    def test_failed_request_no_fabricated_e2e(self, monkeypatch):
+        """A failed request records no e2e — null, never 0.0 (NFR5)."""
+        import urllib.error
+
+        import slam_eval.performance.openai_collector as mod
+
+        def raise_url_error(req):
+            raise urllib.error.URLError("conn reset")
+
+        monkeypatch.setattr(mod.urllib.request, "urlopen", raise_url_error)
+        collector = OpenAiStreamingCollector("http://fake", "Bearer x", "m")
+        result = collector.measure([{"role": "user", "content": "hi"}])
+        assert result["streaming_failed"] is True
+        assert result["e2e_time_s"] is None
