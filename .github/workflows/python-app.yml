@@ -19,6 +19,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Check out slam-core
+      uses: actions/checkout@v4
+      with:
+        repository: anton-pershin/slam-core
+        path: slam-core
     - name: Set up Python 3.13
       uses: actions/setup-python@v3
       with:
@@ -28,11 +33,14 @@ jobs:
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         if [ -f requirements_dev.txt ]; then pip install -r requirements_dev.txt; fi
+        pip install -e ./slam-core
     - name: Lint with pylint and mypy
       run: |
         pylint slam_eval/
         mypy slam_eval/
       continue-on-error: true
     - name: Test with pytest
+      env:
+        SLAM_SHARED_CONFIG_PATH: ${{ github.workspace }}/slam-core/config
       run: |
         pytest
