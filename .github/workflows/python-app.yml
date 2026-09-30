@@ -41,6 +41,7 @@ jobs:
       continue-on-error: true
     - name: Test with pytest
       env:
+        PYTHONPATH: ${{ github.workspace }}
         SLAM_SHARED_CONFIG_PATH: ${{ github.workspace }}/slam-core/config
       run: |
         pytest
