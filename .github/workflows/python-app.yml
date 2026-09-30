@@ -44,4 +44,4 @@ jobs:
         PYTHONPATH: ${{ github.workspace }}
         SLAM_SHARED_CONFIG_PATH: ${{ github.workspace }}/slam-core/config
       run: |
-        pytest
+        python -m pytest --import-mode=prepend tests
