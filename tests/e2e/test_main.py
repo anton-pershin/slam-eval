@@ -153,7 +153,7 @@ def test_main_with_simple_scorer(
     monkeypatch,
 ):
     monkeypatch.setattr(
-        "slam_core.model.request_based_on_message_history",
+        "rally.llm.Llm.request",
         lambda *args, **kwargs: {"role": "assistant", "content": "Test answer 1"},
     )
 
@@ -194,7 +194,7 @@ def test_main_with_complex_scorer(
     monkeypatch,
 ):
     monkeypatch.setattr(
-        "slam_core.model.request_based_on_message_history",
+        "rally.llm.Llm.request",
         lambda *args, **kwargs: {"role": "assistant", "content": "Test answer 1"},
     )
 
