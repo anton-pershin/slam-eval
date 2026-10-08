@@ -385,3 +385,32 @@ def test_in_process_run_counts_prompt_tokens_from_the_model(
     # the clock is frozen, so the measured wall time is exactly zero — the
     # point is that an in-process record carries one at all
     assert records[0]["e2e_time_s"] is not None
+
+
+@freeze_time("2000-01-01")
+def test_config_intended_non_streaming_failure_keeps_its_reason(
+    cfg: DictConfig,
+    eval_case_collection_cfg,
+    storage_adapter_cfg,
+    simple_scorer_cfg,
+    tmp_path,
+    monkeypatch,
+):
+    """FR7/NFR4: a non-streaming run whose request fails keeps its own reason."""
+    monkeypatch.setattr("rally.llm.Llm.request", lambda *args, **kwargs: None)
+    cfg.collection = eval_case_collection_cfg
+    cfg.storage_adapter = storage_adapter_cfg
+    cfg.scorer = simple_scorer_cfg
+    perf_cfg = _enabled_perf_cfg(tmp_path)
+    perf_cfg.streaming = False
+    cfg.performance_monitor = perf_cfg
+
+    main(cfg)
+
+    (aggregated_path,) = Path(tmp_path).rglob("aggregated.json")
+    metadata = json.loads(aggregated_path.read_text())["run_metadata"]
+    assert metadata["streaming"]["supported"] is False
+    assert metadata["streaming"]["fallback_reason"] == "disabled_in_config"
+    records = _raw_records(tmp_path)
+    assert [r["case_id"] for r in records] == [0, 1, 2]
+    assert all(r["e2e_time_s"] is None for r in records)

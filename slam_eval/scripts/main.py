@@ -71,10 +71,15 @@ def main(cfg: DictConfig) -> None:
                 non_streaming=not monitor.streaming,
             )
             if result.get("streaming_failed"):
-                monitor.note_streaming_fallback(
-                    result["fallback_reason"],
-                    warn=not monitor.streaming_fallback_intended,
-                )
+                fallback_reason = result.get("fallback_reason")
+                if fallback_reason is not None:
+                    # A streaming failure names its own reason. The non-streaming
+                    # path cannot tell its failures apart (NFR4), so it names
+                    # none and the run keeps the reason it already records.
+                    monitor.note_streaming_fallback(
+                        fallback_reason,
+                        warn=not monitor.streaming_fallback_intended,
+                    )
                 monitor.note_openai_result(
                     case_index=i,
                     e2e_s=result.get("e2e_time_s"),  # None if no completed request

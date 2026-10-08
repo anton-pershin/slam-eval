@@ -51,7 +51,7 @@ class OpenAiStreamingCollector:
         return self._measure_streaming(messages)
 
     @staticmethod
-    def _failed(reason: str, e2e_s: Optional[float] = None) -> dict[str, Any]:
+    def _failed(reason: Optional[str], e2e_s: Optional[float] = None) -> dict[str, Any]:
         return {
             "streaming_failed": True,
             "fallback_reason": reason,
@@ -66,14 +66,16 @@ class OpenAiStreamingCollector:
 
         if message is None:
             # The Llm's non-streaming request answers None for every failure —
-            # rejected, dropped and timed out alike — so this record names the
-            # fallback and keeps no timing (NFR4).
+            # rejected, dropped and timed out alike — so this record says only
+            # that the measurement fell back: no reason, no timing (NFR4). The
+            # loop below leaves the run's own reason (a config-intended one
+            # included) untouched when no reason is named.
             LOGGER.warning(
                 "Non-streaming request to %s produced no response; "
                 "the record keeps no timing and no reason",
                 self.llm.url,
             )
-            return self._failed("streaming_request_rejected")
+            return self._failed(None)
 
         return {
             "streaming_failed": False,

@@ -345,6 +345,9 @@ class TestCollectorThroughTheLlm:
         result = OpenAiStreamingCollector(llm).measure(MESSAGES, non_streaming=True)
         assert result["streaming_failed"] is True
         assert result["e2e_time_s"] is None
+        # rally's non-streaming request cannot tell the failures apart, so the
+        # record names no reason at all (row 18)
+        assert result.get("fallback_reason") is None
 
     def test_thinking_trace_in_content_reaches_y_pred_verbatim(self):
         llm = StubLlm(
