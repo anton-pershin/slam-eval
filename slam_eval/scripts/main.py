@@ -3,6 +3,7 @@ import logging
 import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig
+from rally.interaction import make_up_message_history
 
 from slam_eval.performance.monitor import PerformanceMonitor
 from slam_eval.performance.openai_collector import OpenAiStreamingCollector
@@ -11,14 +12,6 @@ from slam_eval.utils.common import get_config_path
 
 CONFIG_NAME = "config_main"
 LOGGER = logging.getLogger(__name__)
-
-
-def _build_messages(x) -> list[dict[str, str]]:
-    messages = []
-    if x["system_prompt"] is not None:
-        messages.append({"role": "system", "content": x["system_prompt"]})
-    messages.append({"role": "user", "content": x["user_prompt"]})
-    return messages
 
 
 def main(cfg: DictConfig) -> None:
@@ -41,12 +34,10 @@ def main(cfg: DictConfig) -> None:
             monitor_kwargs.pop("result_dir", None)
         monitor = instantiate(monitor_kwargs)
         if hasattr(model, "llm"):  # OpenAI-compatible path
-            llm = model.llm
-            monitor.openai_collector = OpenAiStreamingCollector(
-                url=llm.url,
-                authorization=getattr(llm, "authorization", None),
-                model=llm.model or "",
-            )
+            # The collector measures through the model's own Llm, so the
+            # request it sends carries the endpoint, the headers, the body and
+            # the cap the model is configured with (FR5).
+            monitor.openai_collector = OpenAiStreamingCollector(llm=model.llm)
         elif hasattr(model, "step_callback"):  # LocalCausalLm in-process path
             model.step_callback = monitor.make_step_callback()
         if perf_cfg.get("result_dir") is not None:
@@ -70,25 +61,25 @@ def main(cfg: DictConfig) -> None:
             # Single-request measurement (FR5/FR11/NFR1): the monitored
             # streaming request IS the prediction. No second request.
             # NOTE (N2): on this branch the collector OWNS the request —
-            # model.predict() is never called. Any request-shaping logic
-            # (system prompts, generation params) must be passed here
-            # explicitly; changes inside the Model class will NOT apply.
-            max_tokens = getattr(model.llm, "max_output_tokens", None)
-            if max_tokens is None and hasattr(model.llm, "max_output_tokens"):
-                raise ValueError(
-                    "model.llm.max_output_tokens is set but resolved to None; "
-                    "the collector would silently drop the generation cap"
-                )
+            # model.predict() is never called, and the request is the Llm's
+            # own (endpoint, generation parameters and cap included).
             result = monitor.openai_collector.measure(
-                _build_messages(eval_case["x"]),
-                max_output_tokens=max_tokens,
+                make_up_message_history(
+                    system_prompt=eval_case["x"]["system_prompt"],
+                    user_prompt=eval_case["x"]["user_prompt"],
+                ),
                 non_streaming=not monitor.streaming,
             )
             if result.get("streaming_failed"):
-                monitor.note_streaming_fallback(
-                    result["fallback_reason"],
-                    warn=not monitor.streaming_fallback_intended,
-                )
+                fallback_reason = result.get("fallback_reason")
+                if fallback_reason is not None:
+                    # A streaming failure names its own reason. The non-streaming
+                    # path cannot tell its failures apart (NFR4), so it names
+                    # none and the run keeps the reason it already records.
+                    monitor.note_streaming_fallback(
+                        fallback_reason,
+                        warn=not monitor.streaming_fallback_intended,
+                    )
                 monitor.note_openai_result(
                     case_index=i,
                     e2e_s=result.get("e2e_time_s"),  # None if no completed request
@@ -111,25 +102,10 @@ def main(cfg: DictConfig) -> None:
             record_appended = True
         else:
             y_pred = model.predict(eval_case["x"])
-            if (
-                monitor is not None
-                and hasattr(model, "step_callback")
-                and hasattr(model, "tokenizer")
-            ):
-                # In-process path: count prompt tokens for FR3
-                messages = _build_messages(eval_case["x"])
-                prompt_text = model.tokenizer.apply_chat_template(
-                    messages,
-                    tokenize=False,
-                    add_generation_prompt=True,
-                    chat_template_kwargs=(
-                        {"enable_thinking": model.enable_thinking}
-                        if getattr(model, "enable_thinking", None) is not None
-                        else {}
-                    ),
-                )
-                prompt_ids = model.tokenizer(prompt_text)["input_ids"]
-                monitor.set_prompt_tokens(i, len(prompt_ids))
+            if monitor is not None and hasattr(model, "step_callback"):
+                # In-process path: the model renders its own prompt, so it is
+                # the model that answers how many tokens that prompt takes (FR9).
+                monitor.set_prompt_tokens(i, model.prompt_token_count(eval_case["x"]))
         if monitor is not None:
             monitor.on_prediction_end(i, record_already_appended=record_appended)
         if monitor is not None:

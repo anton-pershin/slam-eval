@@ -11,6 +11,17 @@ import time
 from typing import Any
 
 import pytest
+from rally.interaction import make_up_message_history
+from rally.llm import (
+    LlmAuthorizationError,
+    LlmStreamEvent,
+    LlmStreamRejectedError,
+    LlmTimeoutError,
+    LlmTransportError,
+    LlmUsage,
+)
+from slam_core.collections.text_generation import TextGenerationInput
+from slam_core.model import LlmViaOpenAiApi
 
 from slam_eval.performance.monitor import PHASE_PREDICT, PHASE_SCORE, PerformanceMonitor
 from slam_eval.performance.openai_collector import OpenAiStreamingCollector
@@ -21,34 +32,33 @@ from slam_eval.performance.storage import LocalPerformanceStorageAdapter
 sys.path.insert(0, "/home/tony/reps/github/anton-pershin/slam-core")
 
 
-class FakeStreamResponse:
-    """Simulates a streaming SSE response with per-chunk delays."""
+class StubLlm:
+    """A `Llm` double: scripted events with arrival delays, calls recorded."""
 
-    def __init__(self, chunks: list[tuple[float, str]], usage: dict | None = None):
-        self._chunks = chunks  # (delay_before_chunk, content)
-        self._usage = usage
+    url = "http://stub.example/v1/chat/completions"
+    model = "stub-model"
 
-    def __iter__(self):
-        return self._gen()
+    def __init__(self, events=(), error=None, message=None):
+        self.events = list(events)  # (delay_before_event, LlmStreamEvent)
+        self.error = error
+        self.message = message
+        self.stream_calls: list[list[dict[str, str]]] = []
+        self.request_calls: list[list[dict[str, str]]] = []
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return False
-
-    def _gen(self):
-        import json as _json
-
-        for delay, content in self._chunks:
+    def stream(self, messages):
+        self.stream_calls.append(messages)
+        if self.error is not None:
+            raise self.error
+        for delay, event in self.events:
             time.sleep(delay)
-            chunk: dict[str, Any] = {
-                "choices": [{"delta": {"content": content}}],
-            }
-            if self._usage is not None and content == self._chunks[-1][1]:
-                chunk["usage"] = self._usage
-            yield ("data: " + _json.dumps(chunk) + "\n\n").encode()
-        yield b"data: [DONE]\n\n"
+            yield event
+
+    def request(self, messages):
+        self.request_calls.append(messages)
+        return self.message
+
+
+MESSAGES = [{"role": "user", "content": "hi"}]
 
 
 class TestStatsRegistry:
@@ -206,51 +216,168 @@ class TestMemorySampler:
         assert all(s["rss_bytes"] > 0 for s in samples)
 
 
-class TestOpenAiStreamingCollector:
-    def _patch_urlopen(self, monkeypatch, response):
-        import slam_eval.performance.openai_collector as mod
+class TestCollectorThroughTheLlm:
+    """FR5/FR7: the collector measures through the Llm it is given and owns
+    nothing else — no url, no headers, no body, no framing, no dialect."""
 
-        monkeypatch.setattr(mod.urllib.request, "urlopen", lambda req: response)
-
-    def test_streaming_ttft_and_usage_preferred(self, monkeypatch):
-        chunks = [(0.05, "Hello"), (0.02, " world"), (0.02, "!")]
-        usage = {"prompt_tokens": 10, "completion_tokens": 7}
-        self._patch_urlopen(monkeypatch, FakeStreamResponse(chunks, usage))
-        collector = OpenAiStreamingCollector("http://fake", None, "m")
-        result = collector.measure([{"role": "user", "content": "hi"}])
+    def test_collector_calls_the_llms_stream_with_the_messages(self):
+        llm = StubLlm(events=[(0.0, LlmStreamEvent(content="hi"))])
+        result = OpenAiStreamingCollector(llm).measure(MESSAGES)
+        assert llm.stream_calls == [MESSAGES]
+        assert llm.request_calls == []
         assert result["streaming_failed"] is False
-        assert 0.04 <= result["ttft_s"] <= 0.2  # ~0.05 s first-chunk delay
-        assert result["prompt_tokens"] == 10
-        assert result["generated_tokens"] == 7  # usage preferred over 3 chunks
-        assert result["tokens_source"] == "usage"
+
+    def test_non_streaming_measurement_requests_through_the_llm(self):
+        llm = StubLlm(message={"role": "assistant", "content": "Hi"})
+        result = OpenAiStreamingCollector(llm).measure(MESSAGES, non_streaming=True)
+        assert llm.request_calls == [MESSAGES]
+        assert llm.stream_calls == []
+        assert result["streaming_failed"] is False
+        assert result["content"] == "Hi"
+        assert result["ttft_s"] is None and result["tpot_s"] is None
+        # rally's request() answers with the message only: no usage to report
+        assert result["prompt_tokens"] is None
+        assert result["generated_tokens"] is None
+
+    def test_ttft_and_tpot_come_from_event_arrival(self):
+        llm = StubLlm(
+            events=[
+                (0.05, LlmStreamEvent(content="Hello")),
+                (0.02, LlmStreamEvent(content=" world")),
+                (0.02, LlmStreamEvent(content="!")),
+            ]
+        )
+        result = OpenAiStreamingCollector(llm).measure(MESSAGES)
+        assert 0.03 <= result["ttft_s"] <= 0.2
         assert result["content"] == "Hello world!"
-        assert result["tpot_s"] is not None
-        # magnitude sanity: TPOT is (last chunk elapsed - ttft) / (n-1), bounded
-        # by e2e; a clock-mixup bug would produce absurd values (regression guard)
         assert 0.0 < result["tpot_s"] < result["e2e_time_s"]
 
-    def test_chunk_count_fallback(self, monkeypatch):
-        chunks = [(0.01, "a"), (0.01, "b")]
-        self._patch_urlopen(monkeypatch, FakeStreamResponse(chunks, usage=None))
-        collector = OpenAiStreamingCollector("http://fake", None, "m")
-        result = collector.measure([{"role": "user", "content": "hi"}])
+    def test_usage_is_preferred_over_content_event_counting(self):
+        llm = StubLlm(
+            events=[
+                (0.01, LlmStreamEvent(content="Hello")),
+                (0.01, LlmStreamEvent(content=" world")),
+                (
+                    0.01,
+                    LlmStreamEvent(
+                        content="!",
+                        usage=LlmUsage(prompt_tokens=10, completion_tokens=7),
+                    ),
+                ),
+            ]
+        )
+        result = OpenAiStreamingCollector(llm).measure(MESSAGES)
+        assert result["tokens_source"] == "usage"
+        assert result["prompt_tokens"] == 10
+        assert result["generated_tokens"] == 7
+
+    def test_absent_usage_falls_back_to_content_event_counting(self):
+        llm = StubLlm(
+            events=[
+                (0.01, LlmStreamEvent(content="a")),
+                (0.01, LlmStreamEvent(content="b")),
+            ]
+        )
+        result = OpenAiStreamingCollector(llm).measure(MESSAGES)
         assert result["tokens_source"] == "chunk_count"
-        assert result["generated_tokens"] == 2  # approximate
+        assert result["generated_tokens"] == 2
         assert result["prompt_tokens"] is None
 
-    def test_streaming_rejected(self, monkeypatch):
-        import urllib.error
+    def test_authorization_error_aborts(self):
+        llm = StubLlm(error=LlmAuthorizationError("HTTP 401"))
+        with pytest.raises(RuntimeError, match="Authorization failed"):
+            OpenAiStreamingCollector(llm).measure(MESSAGES)
 
-        import slam_eval.performance.openai_collector as mod
-
-        def raise_http(req):
-            raise urllib.error.HTTPError(req.full_url, 400, "no stream", None, None)
-
-        monkeypatch.setattr(mod.urllib.request, "urlopen", raise_http)
-        collector = OpenAiStreamingCollector("http://fake", None, "m")
-        result = collector.measure([{"role": "user", "content": "hi"}])
+    def test_rejected_streaming_request_falls_back(self):
+        llm = StubLlm(error=LlmStreamRejectedError(400, "no stream"))
+        result = OpenAiStreamingCollector(llm).measure(MESSAGES)
         assert result["streaming_failed"] is True
         assert result["fallback_reason"] == "streaming_request_rejected"
+
+    def test_transport_error_falls_back_without_e2e(self):
+        llm = StubLlm(error=LlmTransportError("conn reset"))
+        result = OpenAiStreamingCollector(llm).measure(MESSAGES)
+        assert result["streaming_failed"] is True
+        assert result["e2e_time_s"] is None
+
+    def test_timeout_gives_the_same_record_as_a_transport_error(self):
+        llm = StubLlm(error=LlmTimeoutError("no data for 30s"))
+        result = OpenAiStreamingCollector(llm).measure(MESSAGES)
+        assert result["streaming_failed"] is True
+        assert result["fallback_reason"] == "streaming_request_rejected"
+        assert result["e2e_time_s"] is None
+
+    def test_truncated_stream_is_the_completed_answer(self):
+        """FR8: the cap cut the answer short — what arrived IS the answer."""
+        llm = StubLlm(
+            events=[
+                (0.01, LlmStreamEvent(reasoning="thinking out loud")),
+                (0.0, LlmStreamEvent(finish_reason="length", truncated=True)),
+            ]
+        )
+        result = OpenAiStreamingCollector(llm).measure(MESSAGES)
+        assert result["streaming_failed"] is False
+        assert result["content"] == ""
+        assert result["ttft_s"] is None  # no content event ever arrived
+
+    def test_truncated_stream_with_partial_content_keeps_the_content(self):
+        llm = StubLlm(
+            events=[
+                (0.01, LlmStreamEvent(content='{"name"')),
+                (0.0, LlmStreamEvent(finish_reason="length", truncated=True)),
+            ]
+        )
+        result = OpenAiStreamingCollector(llm).measure(MESSAGES)
+        assert result["streaming_failed"] is False
+        assert result["content"] == '{"name"'
+        assert result["ttft_s"] is not None
+
+    def test_no_content_and_not_truncated_reports_unavailability(self):
+        llm = StubLlm(events=[(0.01, LlmStreamEvent(reasoning="thinking only"))])
+        result = OpenAiStreamingCollector(llm).measure(MESSAGES)
+        assert result["streaming_failed"] is True
+        assert result["fallback_reason"] == "streaming_request_rejected"
+
+    def test_non_streaming_failure_record_shape(self):
+        """NFR4: rally's request() answers None for every failure; the record
+        says a fallback happened, keeps no timing and names no reason."""
+        llm = StubLlm(message=None)
+        result = OpenAiStreamingCollector(llm).measure(MESSAGES, non_streaming=True)
+        assert result["streaming_failed"] is True
+        assert result["e2e_time_s"] is None
+        # rally's non-streaming request cannot tell the failures apart, so the
+        # record names no reason at all (row 18)
+        assert result.get("fallback_reason") is None
+
+    def test_thinking_trace_in_content_reaches_y_pred_verbatim(self):
+        llm = StubLlm(
+            events=[(0.0, LlmStreamEvent(content="<think>hmm</think>answer"))]
+        )
+        result = OpenAiStreamingCollector(llm).measure(MESSAGES)
+        assert result["content"] == "<think>hmm</think>answer"
+
+    def test_collector_and_predict_send_the_same_messages(self):
+        llm = StubLlm(
+            events=[(0.0, LlmStreamEvent(content="ok"))],
+            message={"role": "assistant", "content": "ok"},
+        )
+        model = LlmViaOpenAiApi("m", llm)
+        x = TextGenerationInput(system_prompt="be nice", user_prompt="hello")
+
+        OpenAiStreamingCollector(llm).measure(
+            make_up_message_history(
+                system_prompt=x["system_prompt"], user_prompt=x["user_prompt"]
+            )
+        )
+        model.predict(x)
+
+        assert llm.stream_calls == llm.request_calls
+        assert llm.stream_calls == [
+            [
+                {"role": "system", "content": "be nice"},
+                {"role": "user", "content": "hello"},
+            ]
+        ]
 
 
 class TestStorage:
@@ -327,34 +454,6 @@ class TestSingleRequestOpenAiPath:
         monitor.on_prediction_end(0, record_already_appended=True)
         assert monitor.raw_records[0]["tpot_s"] == 0.111
 
-    def test_non_streaming_branch(self, monkeypatch):
-        import slam_eval.performance.openai_collector as mod
-
-        class FakeResponse:
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *a):
-                return False
-
-            def read(self):
-                return json.dumps(
-                    {
-                        "choices": [{"message": {"content": "Hi"}}],
-                        "usage": {"prompt_tokens": 3, "completion_tokens": 2},
-                    }
-                ).encode()
-
-        monkeypatch.setattr(mod.urllib.request, "urlopen", lambda req: FakeResponse())
-        collector = OpenAiStreamingCollector("http://fake", None, "m")
-        result = collector.measure(
-            [{"role": "user", "content": "hi"}], non_streaming=True
-        )
-        assert result["streaming_failed"] is False
-        assert result["content"] == "Hi"
-        assert result["ttft_s"] is None and result["tpot_s"] is None
-        assert result["prompt_tokens"] == 3 and result["generated_tokens"] == 2
-
     def test_phase_tag_order_scoring(self):
         """FR7: scorer runs INSIDE the score phase (loop order fixed)."""
         monitor = PerformanceMonitor()
@@ -364,37 +463,6 @@ class TestSingleRequestOpenAiPath:
         assert monitor._phase == "score"  # scorer executes here in main.py
         monitor.on_scoring_end()
         assert monitor._phase == "idle"
-
-
-class TestAuthFailure:
-    def test_auth_failure_raises(self, monkeypatch):
-        """401/403 => RuntimeError, never a silent metrics fallback."""
-        import urllib.error
-
-        import slam_eval.performance.openai_collector as mod
-
-        def raise_401(req):
-            raise urllib.error.HTTPError(req.full_url, 401, "Unauthorized", None, None)
-
-        monkeypatch.setattr(mod.urllib.request, "urlopen", raise_401)
-        collector = OpenAiStreamingCollector("http://fake", "Bearer bad", "m")
-        with pytest.raises(RuntimeError, match="Authorization failed"):
-            collector.measure([{"role": "user", "content": "hi"}])
-
-    def test_failed_request_no_fabricated_e2e(self, monkeypatch):
-        """A failed request records no e2e — null, never 0.0 (NFR5)."""
-        import urllib.error
-
-        import slam_eval.performance.openai_collector as mod
-
-        def raise_url_error(req):
-            raise urllib.error.URLError("conn reset")
-
-        monkeypatch.setattr(mod.urllib.request, "urlopen", raise_url_error)
-        collector = OpenAiStreamingCollector("http://fake", "Bearer x", "m")
-        result = collector.measure([{"role": "user", "content": "hi"}])
-        assert result["streaming_failed"] is True
-        assert result["e2e_time_s"] is None
 
 
 class TestStreamingDisabledMetadata:
