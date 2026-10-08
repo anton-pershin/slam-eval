@@ -40,6 +40,7 @@ source = "versioningit"
 default-version = "0.0.0"
 
 [tool.isort]
+profile = "black"
 line_length = 88
 known_third_party = "hydra, rally"
 
