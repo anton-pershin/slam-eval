@@ -121,6 +121,9 @@ class OpenAiStreamingCollector:
             LOGGER.warning("Streaming request rejected: %s", err)
             return self._failed("streaming_request_rejected")
         except LlmError as err:
+            # The intended catch-all: every other failure rally raises —
+            # transport, timeout, and any family added later — is one fallback
+            # to this measurement, recorded as such with null timings.
             LOGGER.warning("Streaming request failed: %s", err)
             return self._failed("streaming_request_rejected")
 
